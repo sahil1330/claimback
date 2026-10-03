@@ -34,13 +34,10 @@ function Obligation({ item, checked, onToggle, canSelect }: {
     <li className="rounded-xl border border-border bg-surface p-4">
       <div className="flex items-start gap-3">
         {canSelect && item.outstanding_paise > 0 && (
-          <input
-            aria-label={`Apply later credit to obligation from ${new Date(item.created_at).toLocaleDateString("en-IN")}`}
-            type="checkbox"
-            checked={checked}
-            onChange={onToggle}
-            className="mt-1 size-4 accent-primary"
-          />
+          <label className="flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-lg hover:bg-surface-soft">
+            <input type="checkbox" checked={checked} onChange={onToggle} className="size-5 accent-primary" />
+            <span className="sr-only">Apply later credit to {money(item.outstanding_paise)} obligation from {new Date(item.created_at).toLocaleDateString("en-IN")}</span>
+          </label>
         )}
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-start justify-between gap-2">

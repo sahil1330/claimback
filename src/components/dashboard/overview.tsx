@@ -115,7 +115,7 @@ export function DashboardOverview({
       <section aria-labelledby="margin-protected-heading" className="relative overflow-hidden rounded-[1.5rem] bg-[#123f2d] p-6 text-white shadow-sm sm:p-8 lg:p-10">
         <div aria-hidden="true" className="pointer-events-none absolute -right-28 -top-40 size-[28rem] rounded-full border border-white/10" />
         <div aria-hidden="true" className="pointer-events-none absolute -right-10 -top-24 size-[20rem] rounded-full border border-white/10" />
-        <div className="relative flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
+        <div className="relative">
           <div>
             <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-[#d6f4df]">
               <ShieldCheck className="size-4" aria-hidden="true" /> Verified recovery
@@ -128,9 +128,6 @@ export function DashboardOverview({
               Counted only when recovery is recorded as verified. A supplier promise stays in pending recovery.
             </p>
           </div>
-          <Link href="/app/receive" className="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 self-start rounded-lg bg-white px-5 text-sm font-semibold text-[#123f2d] transition-colors hover:bg-[#e5f4ea] lg:self-auto">
-            Receive Stock <ArrowRight className="size-4" aria-hidden="true" />
-          </Link>
         </div>
       </section>
 

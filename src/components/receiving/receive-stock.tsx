@@ -76,6 +76,7 @@ export function ReceiveStock() {
   const [receivingResult, setReceivingResult] = useState<ReceivingResult | null>(null);
   const [suggestionMessage, setSuggestionMessage] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<ReceivingDraft[]>([]);
+  const [suggestedFields, setSuggestedFields] = useState<Set<string>>(() => new Set());
   const [countsConfirmed, setCountsConfirmed] = useState(false);
   const [supplierConfirmed, setSupplierConfirmed] = useState(false);
   const [result, setResult] = useState<ReconcileResult | null>(null);
@@ -87,12 +88,28 @@ export function ReceiveStock() {
 
   function updateDraft(index: number, changes: Partial<ReceivingDraft>) {
     setDrafts((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, ...changes } : item));
+    setSuggestedFields((current) => {
+      const next = new Set(current);
+      for (const field of ["paid", "free", "damaged"]) {
+        if (field in changes) next.delete(`${index}:${field}`);
+      }
+      return next;
+    });
     setCountsConfirmed(false);
     setResult(null);
   }
 
   function changeReceivingNote(note: string) {
     setReceivingText(note);
+    if (suggestedFields.size) {
+      setDrafts((current) => current.map((draft, index) => ({
+        ...draft,
+        paid: suggestedFields.has(`${index}:paid`) ? "" : draft.paid,
+        free: suggestedFields.has(`${index}:free`) ? "" : draft.free,
+        damaged: suggestedFields.has(`${index}:damaged`) ? "" : draft.damaged,
+      })));
+      setSuggestedFields(new Set());
+    }
     setReceivingResult(null);
     setSuggestionMessage(null);
     setCountsConfirmed(false);
@@ -207,19 +224,30 @@ export function ReceiveStock() {
       list.push(line);
       proposed.set(index, list);
     }
-    const safe = new Map(Array.from(proposed).filter(([, lines]) => lines.length === 1).map(([index, lines]) => [index, lines[0]]));
-    setDrafts((current) => current.map((draft, index) => {
-      const suggestion = safe.get(index);
-      return suggestion ? {
-        ...draft,
-        paid: suggestion.receivedQuantity === null || suggestion.uncertainties.some((item) => item.field === "receivedQuantity") ? draft.paid : String(suggestion.receivedQuantity),
-        free: suggestion.receivedFreeQuantity === null || suggestion.uncertainties.some((item) => item.field === "receivedFreeQuantity") ? draft.free : String(suggestion.receivedFreeQuantity),
-        damaged: suggestion.damagedQuantity === null || suggestion.uncertainties.some((item) => item.field === "damagedQuantity") ? draft.damaged : String(suggestion.damagedQuantity),
-      } : draft;
-    }));
+    const staged = new Map<number, Partial<ReceivingDraft>>();
+    const marked = new Set<string>();
+    for (const [index, lines] of proposed) {
+      if (lines.length !== 1) continue;
+      const line = lines[0];
+      const fields = [
+        ["paid", "receivedQuantity"],
+        ["free", "receivedFreeQuantity"],
+        ["damaged", "damagedQuantity"],
+      ] as const;
+      const values: Partial<ReceivingDraft> = {};
+      for (const [field, sourceField] of fields) {
+        const value = line[sourceField];
+        if (value === null || line.uncertainties.some((item) => item.field === sourceField)) continue;
+        values[field] = String(value);
+        marked.add(`${index}:${field}`);
+      }
+      if (Object.keys(values).length) staged.set(index, values);
+    }
+    setDrafts((current) => current.map((draft, index) => ({ ...draft, ...staged.get(index) })));
+    setSuggestedFields(marked);
     setCountsConfirmed(false);
     setResult(null);
-    return safe.size;
+    return staged.size;
   }
 
   async function runReconciliation() {
@@ -263,9 +291,9 @@ export function ReceiveStock() {
           <div className="mt-5 space-y-4"><SourceStatus result={agreementResult} label="Supplier promise" />{agreementResult?.status === "needs_confirmation" && caseId && <SourceConfirmation key={agreementResult.facts.source.sourceArtifactId} caseId={caseId} label="Supplier promise" facts={agreementResult.facts} confirmations={agreementResult.confirmations} busy={busy === "confirmAgreement"} onSubmit={confirmAgreement} />}{agreementResult && agreementResult.status !== "error" && <FactLines facts={agreementResult.facts} kind="promise" />}</div>
         </section>
         <section aria-labelledby="receiving-heading" className={`${step === 2 ? "block" : "hidden"} rounded-2xl border border-border bg-surface p-5 shadow-sm lg:block lg:p-6`}>
-          <span className="flex size-10 items-center justify-center rounded-xl bg-success-soft text-primary"><PackageCheck className="size-5" aria-hidden="true" /></span><h2 id="receiving-heading" className="mt-4 text-lg font-semibold">3. Confirm stock received</h2><p className="mt-1 text-sm leading-6 text-muted">Review ClaimBack's suggestions against your actual count. You can correct each number here.</p>
+          <span className="flex size-10 items-center justify-center rounded-xl bg-success-soft text-primary"><PackageCheck className="size-5" aria-hidden="true" /></span><h2 id="receiving-heading" className="mt-4 text-lg font-semibold">3. Confirm stock received</h2><p className="mt-1 text-sm leading-6 text-muted">Review ClaimBack’s suggestions against your actual count. You can correct each number here.</p>
           {receivingText && <p className="mt-4 rounded-lg bg-surface-soft p-3 text-xs leading-5 text-muted">Your note: {receivingText}</p>}
-          {receivingResult && <div className="mt-4 rounded-lg bg-surface-soft p-3 text-sm">{receivingResult.status === "error" ? <p role="alert">{receivingResult.error.message} Enter counts manually.</p> : <><p className="font-semibold">Understood from your note</p><ul className="mt-2 space-y-1 text-xs text-muted">{receivingResult.facts.lines.map((line, index) => <li key={index}>{line.rawName}: {line.receivedQuantity ?? "?"} paid, {line.receivedFreeQuantity ?? "?"} free, {line.damagedQuantity ?? "?"} damaged</li>)}</ul>{receivingResult.facts.lines.flatMap((line) => line.uncertainties).map((item, index) => <p key={index} className="mt-2 text-xs text-warning">Please check {item.field}: {item.reason}</p>)}{suggestionMessage && <p className="mt-2 text-xs text-primary">{suggestionMessage}</p>}</>}</div>}
+          {receivingResult && <div className="mt-4 rounded-lg bg-surface-soft p-3 text-sm">{receivingResult.status === "error" ? <p role="alert">{receivingResult.error.message} Enter counts manually.</p> : <><p className="font-semibold">Understood from your note</p><ul className="mt-2 space-y-1 text-xs text-muted">{receivingResult.facts.lines.map((line, index) => <li key={index}>{line.rawName}: {line.receivedQuantity ?? "?"} paid, {line.receivedFreeQuantity ?? "?"} free, {line.damagedQuantity ?? "?"} damaged</li>)}</ul>{receivingResult.facts.lines.flatMap((line) => line.uncertainties.map((item) => ({ product: line.rawName, ...item }))).map((item, index) => <p key={index} className="mt-2 text-xs text-warning">Please check {item.product} {item.field === "damagedQuantity" ? "damaged count" : item.field === "receivedFreeQuantity" ? "free count" : item.field === "receivedQuantity" ? "paid count" : "details"}: {item.reason}</p>)}{suggestionMessage && <p className="mt-2 text-xs text-primary">{suggestionMessage}</p>}</>}</div>}
           {invoice && agreement && <div className="mt-5 space-y-4">{invoice.lines.map((line, index) => { const draft = drafts[index]; if (!draft) return null; const promised = draft.promisedIndex === null ? null : agreement.lines[draft.promisedIndex]; return <div key={`${line.rawName}-${index}`} className="rounded-xl border border-border p-3"><p className="text-sm font-semibold">{line.rawName}</p><label className="mt-3 block text-xs font-semibold">Matches supplier promise<select className={`${fieldClass} mt-1`} value={draft.promisedIndex ?? ""} onChange={(event) => updateDraft(index, { promisedIndex: event.target.value === "" ? null : Number(event.target.value), matchConfirmed: false })}><option value="">Choose a product</option>{agreement.lines.map((option, optionIndex) => <option key={optionIndex} value={optionIndex}>{option.rawName}</option>)}</select></label>{promised && <label className="mt-3 flex items-start gap-2 text-xs text-muted"><input type="checkbox" className="mt-0.5 accent-primary" checked={draft.matchConfirmed} onChange={(event) => updateDraft(index, { matchConfirmed: event.target.checked })} />I confirmed this product match against both documents</label>}<div className="mt-4 grid grid-cols-3 gap-2">{(["paid", "free", "damaged"] as const).map((field) => <label key={field} className="text-xs font-semibold capitalize">{field}<input className={`${fieldClass} mt-1 px-2 font-mono`} inputMode="numeric" pattern="[0-9]*" value={draft[field]} onChange={(event) => updateDraft(index, { [field]: event.target.value })} placeholder={field === "free" && !promised?.scheme ? "—" : "0"} /></label>)}</div></div>; })}</div>}
           {namesDiffer && <label className="mt-4 flex items-start gap-2 rounded-lg bg-warning-soft p-3 text-xs text-warning"><input type="checkbox" className="mt-0.5 accent-primary" checked={supplierConfirmed} onChange={(event) => setSupplierConfirmed(event.target.checked)} />Invoice says “{invoice?.supplierName}” and promise says “{agreement?.supplierName}”. I confirmed these are the same supplier.</label>}
           {invoice && agreement && <label className="mt-4 flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1 accent-primary" checked={countsConfirmed} onChange={(event) => setCountsConfirmed(event.target.checked)} />I counted and confirmed the paid, free and damaged units above.</label>}
