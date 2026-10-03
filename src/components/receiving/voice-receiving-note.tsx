@@ -90,7 +90,7 @@ export function VoiceReceivingNote({ disabled, onConfirm }: { disabled: boolean;
   }
 
   return <div className="inline-flex items-center gap-2">
-    <button type="button" aria-label={state === "recording" ? "Stop recording" : state === "transcribing" ? "Transcribing speech" : "Speak to ClaimBack"} title={state === "recording" ? "Stop recording" : "Speak to ClaimBack"} className={`flex size-11 items-center justify-center rounded-lg border transition-colors ${state === "recording" ? "border-primary bg-success-soft text-primary" : "border-border bg-surface text-primary hover:border-primary"}`} disabled={disabled || state === "transcribing"} onClick={() => state === "recording" ? recorderRef.current?.stop() : void startRecording()}>
+    <button type="button" aria-label={state === "recording" ? "Stop recording" : state === "transcribing" ? "Transcribing speech" : "Speak to ClaimBack"} title={state === "recording" ? "Stop recording" : "Speak to ClaimBack"} className={`flex size-11 items-center justify-center rounded-lg border transition-colors ${state === "recording" ? "border-primary bg-success-soft text-primary" : "border-border bg-surface text-primary hover:border-primary"}`} disabled={(disabled && state !== "recording") || state === "transcribing"} onClick={() => state === "recording" ? recorderRef.current?.stop() : void startRecording()}>
       {state === "recording" ? <Square className="size-4" aria-hidden="true" /> : state === "transcribing" ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : <Mic className="size-4" aria-hidden="true" />}
     </button>
     {state === "recording" && <span role="status" className="text-xs font-medium text-primary">Recording… tap to stop</span>}
