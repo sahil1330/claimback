@@ -29,7 +29,7 @@ export async function inspectCase(caseId: string) {
   const { supabase, userId } = await requireMerchant();
   await assertCaseOwnership(supabase, caseId, userId);
   const { data, error } = await supabase.from("cases")
-    .select("id, title, status, supplier_id, promised, billed, received, discrepancies, potential_recovery_paise, recovered_paise, outstanding_paise, merchant_approved_at, claim_sent_at")
+    .select("id, title, status, supplier_id, promised, billed, received, discrepancies, potential_recovery_paise, recovered_paise, outstanding_paise, merchant_approved_at, claim_sent_at, next_follow_up_at")
     .eq("id", caseId).eq("user_id", userId).single();
   if (error) throw error;
   return data;

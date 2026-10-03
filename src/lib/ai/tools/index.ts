@@ -8,6 +8,7 @@ import { appendCaseEvent } from "../../cases/events";
 import { CaseReconciliationError, inspectCase, reconcileStoredCase } from "../../cases/reconcile";
 import { ClaimOperationError, createDraftClaim, sendSupplierMessage } from "../../claims/operations";
 import { verifyRecovery } from "../../recovery/verify";
+import { followupReasonSchema, scheduleCaseFollowup, FollowupScheduleError } from "../../followup/schedule";
 
 type ToolContext = { caseId: string; userId: string };
 
@@ -24,7 +25,7 @@ async function runCaseTool<T>(context: ToolContext, name: string, action: () => 
     });
     return { ok: true as const, result };
   } catch (error) {
-    const message = error instanceof ClaimOperationError || error instanceof CaseReconciliationError
+    const message = error instanceof ClaimOperationError || error instanceof CaseReconciliationError || error instanceof FollowupScheduleError
       ? error.message
       : "This step could not be completed. Please retry or review the case evidence.";
     await appendCaseEvent(admin, {
@@ -64,6 +65,14 @@ export function createAgentTools(context: ToolContext) {
       inputSchema: z.object({ artifactId: z.uuid(), obligationIds: z.array(z.uuid()).max(20).optional() }),
       execute: ({ artifactId, obligationIds }) => runCaseTool(context, "verify_recovery",
         () => verifyRecovery({ caseId: context.caseId, artifactId, obligationIds })),
+    }),
+    scheduleFollowup: tool({
+      description: "Schedule a reminder for a sent claim with outstanding recovery. This never changes recovered money or case state. Use only when a supplier response or promised credit needs a later check.",
+      inputSchema: z.object({ delayHours: z.number().int().min(1).max(24 * 30), reason: followupReasonSchema }),
+      execute: ({ delayHours, reason }) => runCaseTool(context, "schedule_followup",
+        () => scheduleCaseFollowup(context.caseId, {
+          scheduledFor: new Date(Date.now() + delayHours * 60 * 60 * 1000).toISOString(), reason,
+        })),
     }),
   };
 }
