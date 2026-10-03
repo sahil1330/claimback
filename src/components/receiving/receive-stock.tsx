@@ -9,6 +9,8 @@ import type { AgreementFacts, InvoiceFacts, ReceivingFacts } from "@/types/domai
 import { DiscrepancyResult } from "@/components/claims/discrepancy-result";
 import { matchFactLines } from "@/lib/ai/match-facts";
 import {
+  confirmAgreementSource,
+  confirmInvoiceSource,
   createReceivingCase,
   extractAgreement,
   extractInvoice,
@@ -19,6 +21,7 @@ import {
 import { initialReceivingDrafts, prepareCaseFacts, type ReceivingDraft } from "./prepare-facts";
 import { AgentAssistant } from "./agent-assistant";
 import { VoiceReceivingNote } from "./voice-receiving-note";
+import { SourceConfirmation, type SourceConfirmationSubmission } from "./source-confirmation";
 
 type InvoiceResult = Awaited<ReturnType<typeof extractInvoice>>;
 type AgreementResult = Awaited<ReturnType<typeof extractAgreement>>;
@@ -41,15 +44,7 @@ function ProcessButton({ busy, children, disabled, onClick }: { busy: boolean; c
 function SourceStatus({ result, label }: { result: InvoiceResult | AgreementResult | null; label: string }) {
   if (!result) return null;
   if (result.status === "error") return <p role="alert" className="rounded-lg bg-danger-soft p-3 text-sm text-danger">{result.error.code === "MODEL_NOT_CONFIGURED" ? "AI extraction is unavailable until the model is configured." : result.error.message} Replace the source or retry when extraction is available.</p>;
-  if (result.status === "needs_confirmation") {
-    return (
-      <div role="status" className="rounded-lg border border-warning/20 bg-warning-soft p-3 text-sm text-warning">
-        <p className="font-semibold">{label} needs a clearer source before a claim can be calculated.</p>
-        <ul className="mt-2 list-disc space-y-1 pl-5">{result.confirmations.map((item, index) => <li key={`${item.field}-${index}`}>{item.reason} ({item.field})</li>)}</ul>
-        <p className="mt-2">Choose another file or clearer text and run extraction again.</p>
-      </div>
-    );
-  }
+  if (result.status === "needs_confirmation") return null;
   return <p className="inline-flex items-center gap-2 rounded-full bg-success-soft px-3 py-1.5 text-xs font-semibold text-primary"><Check className="size-4" aria-hidden="true" />{label} understood</p>;
 }
 
@@ -69,7 +64,7 @@ function FactLines({ facts, kind }: { facts: InvoiceFacts | AgreementFacts; kind
 
 export function ReceiveStock() {
   const [step, setStep] = useState<Step>(0);
-  const [busy, setBusy] = useState<"invoice" | "agreement" | "receiving" | "reconcile" | null>(null);
+  const [busy, setBusy] = useState<"invoice" | "agreement" | "confirmInvoice" | "confirmAgreement" | "receiving" | "reconcile" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [supplierName, setSupplierName] = useState("");
   const [caseId, setCaseId] = useState<string | null>(null);
@@ -138,6 +133,33 @@ export function ReceiveStock() {
       }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not process the supplier promise. Retry with clearer evidence.");
+    } finally { setBusy(null); }
+  }
+
+  async function confirmInvoice(submission: SourceConfirmationSubmission) {
+    if (!caseId || invoiceResult?.status !== "needs_confirmation") return;
+    setBusy("confirmInvoice"); setError(null); setResult(null);
+    try {
+      const confirmed = await confirmInvoiceSource(caseId, invoiceResult.facts.source.sourceArtifactId, submission);
+      setInvoiceResult(confirmed);
+      if (confirmed.status === "ready") {
+        setAgreementResult(null); setDrafts([]); setReceivingResult(null); setSuggestionMessage(null);
+        setStep(1);
+      } else if (confirmed.status === "error") throw new Error(confirmed.error.message);
+    } finally { setBusy(null); }
+  }
+
+  async function confirmAgreement(submission: SourceConfirmationSubmission) {
+    if (!caseId || !invoice || agreementResult?.status !== "needs_confirmation") return;
+    setBusy("confirmAgreement"); setError(null); setResult(null);
+    try {
+      const confirmed = await confirmAgreementSource(caseId, agreementResult.facts.source.sourceArtifactId, submission);
+      setAgreementResult(confirmed);
+      if (confirmed.status === "ready") {
+        setDrafts(initialReceivingDrafts(invoice, confirmed.facts));
+        setReceivingResult(null); setSuggestionMessage(null); setCountsConfirmed(false);
+        setStep(2);
+      } else if (confirmed.status === "error") throw new Error(confirmed.error.message);
     } finally { setBusy(null); }
   }
 
@@ -220,7 +242,7 @@ export function ReceiveStock() {
       </div>
       <AgentAssistant caseId={caseId} chatReady={completed} canFill={Boolean(invoice && agreement && !completed)} busy={Boolean(busy)} locked={completed} note={receivingText} onNoteChange={changeReceivingNote} onFill={understandReceiving} />
       {error && <div role="alert" className="rounded-xl border border-danger/20 bg-danger-soft p-4 text-sm text-danger">{error}</div>}
-      {busy && <p role="status" aria-live="polite" className="inline-flex items-center gap-2 text-sm font-medium text-primary"><LoaderCircle className="size-4 animate-spin" aria-hidden="true" />{busy === "invoice" ? "Uploading and understanding invoice…" : busy === "agreement" ? "Understanding supplier promise…" : busy === "receiving" ? "Understanding your receiving note…" : "Checking the three truths…"}</p>}
+      {busy && <p role="status" aria-live="polite" className="inline-flex items-center gap-2 text-sm font-medium text-primary"><LoaderCircle className="size-4 animate-spin" aria-hidden="true" />{busy === "invoice" ? "Uploading and understanding invoice…" : busy === "agreement" ? "Understanding supplier promise…" : busy === "confirmInvoice" || busy === "confirmAgreement" ? "Saving confirmed source facts…" : busy === "receiving" ? "Understanding your receiving note…" : "Checking the three truths…"}</p>}
       <div className="grid items-start gap-5 lg:grid-cols-3">
         <section aria-labelledby="invoice-heading" className={`${step === 0 ? "block" : "hidden"} rounded-2xl border border-border bg-surface p-5 shadow-sm lg:block lg:p-6`}>
           <span className="flex size-10 items-center justify-center rounded-xl bg-success-soft text-primary"><FileText className="size-5" aria-hidden="true" /></span><h2 id="invoice-heading" className="mt-4 text-lg font-semibold">1. Invoice</h2><p className="mt-1 text-sm leading-6 text-muted">Upload the invoice PDF, photo or plain text.</p>
@@ -228,7 +250,7 @@ export function ReceiveStock() {
           <label className="mt-4 block text-xs font-semibold">Invoice file<input className={`${fieldClass} mt-2 py-2`} type="file" accept=".pdf,image/jpeg,image/png,image/webp,text/plain" onChange={(event) => setInvoiceFile(event.target.files?.[0] ?? null)} /></label>
           <label className="mt-2 block text-xs font-semibold text-primary">Or take an invoice photo<input className={`${fieldClass} mt-1 py-2`} type="file" accept="image/*" capture="environment" onChange={(event) => setInvoiceFile(event.target.files?.[0] ?? null)} /></label>
           <div className="mt-4"><ProcessButton busy={busy === "invoice"} disabled={Boolean(busy) || completed} onClick={runInvoice}><UploadCloud aria-hidden="true" />{caseId ? "Replace & understand invoice" : "Start review"}</ProcessButton></div>
-          <div className="mt-5 space-y-4"><SourceStatus result={invoiceResult} label="Invoice" />{invoice && <FactLines facts={invoice} kind="invoice" />}</div>
+          <div className="mt-5 space-y-4"><SourceStatus result={invoiceResult} label="Invoice" />{invoiceResult?.status === "needs_confirmation" && caseId && <SourceConfirmation key={invoiceResult.facts.source.sourceArtifactId} caseId={caseId} label="Invoice" facts={invoiceResult.facts} confirmations={invoiceResult.confirmations} busy={busy === "confirmInvoice"} onSubmit={confirmInvoice} />}{invoiceResult && invoiceResult.status !== "error" && <FactLines facts={invoiceResult.facts} kind="invoice" />}</div>
         </section>
         <section aria-labelledby="agreement-heading" className={`${step === 1 ? "block" : "hidden"} rounded-2xl border border-border bg-surface p-5 shadow-sm lg:block lg:p-6`}>
           <span className="flex size-10 items-center justify-center rounded-xl bg-success-soft text-primary"><MessageSquareText className="size-5" aria-hidden="true" /></span><h2 id="agreement-heading" className="mt-4 text-lg font-semibold">2. Supplier promise</h2><p className="mt-1 text-sm leading-6 text-muted">Use the agreed message, rate or scheme as evidence.</p>
@@ -237,7 +259,7 @@ export function ReceiveStock() {
           <p className="my-3 text-center text-xs font-semibold uppercase tracking-wider text-muted">or paste the message</p>
           <label className="block text-xs font-semibold">Supplier message<textarea className={`${fieldClass} mt-2 min-h-28 py-3`} value={agreementText} disabled={!invoice || Boolean(agreementFile)} onChange={(event) => setAgreementText(event.target.value)} placeholder="50 boxes at ₹428, 10+1 free units..." /></label>
           <div className="mt-4"><ProcessButton busy={busy === "agreement"} disabled={!invoice || Boolean(busy) || completed} onClick={runAgreement}><UploadCloud aria-hidden="true" />Understand promise</ProcessButton></div>
-          <div className="mt-5 space-y-4"><SourceStatus result={agreementResult} label="Supplier promise" />{agreement && <FactLines facts={agreement} kind="promise" />}</div>
+          <div className="mt-5 space-y-4"><SourceStatus result={agreementResult} label="Supplier promise" />{agreementResult?.status === "needs_confirmation" && caseId && <SourceConfirmation key={agreementResult.facts.source.sourceArtifactId} caseId={caseId} label="Supplier promise" facts={agreementResult.facts} confirmations={agreementResult.confirmations} busy={busy === "confirmAgreement"} onSubmit={confirmAgreement} />}{agreementResult && agreementResult.status !== "error" && <FactLines facts={agreementResult.facts} kind="promise" />}</div>
         </section>
         <section aria-labelledby="receiving-heading" className={`${step === 2 ? "block" : "hidden"} rounded-2xl border border-border bg-surface p-5 shadow-sm lg:block lg:p-6`}>
           <span className="flex size-10 items-center justify-center rounded-xl bg-success-soft text-primary"><PackageCheck className="size-5" aria-hidden="true" /></span><h2 id="receiving-heading" className="mt-4 text-lg font-semibold">3. Stock received</h2><p className="mt-1 text-sm leading-6 text-muted">Speak or type what arrived. AI can suggest counts, but only you confirm them.</p>
