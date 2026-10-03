@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { CheckCircle2, ExternalLink, FileSearch, ShieldCheck } from "lucide-react";
 import type { Discrepancy, SourceEvidence } from "@/types/domain";
 import { formatPaise } from "@/components/dashboard/metrics";
@@ -9,10 +10,10 @@ import { loadVisibleEvents, type VisibleEvent } from "./events";
 
 type Result =
   | { outcome: "clean"; message: string; discrepancies: [] }
-  | { outcome: "discrepancy"; message: string; discrepancies: Discrepancy[]; totalPotentialRecoveryPaise: number }
+  | { outcome: "discrepancy"; message: string; discrepancies: Discrepancy[]; totalPotentialRecoveryPaise: number | string }
   | { outcome: "needs_confirmation"; message: string; confirmations: { reason: string }[] };
 
-function Evidence({ caseId, source, label, value }: { caseId: string; source: SourceEvidence; label: string; value: string }) {
+function Evidence({ caseId, source, label, value, receivingAnchor }: { caseId: string; source: SourceEvidence; label: string; value: string; receivingAnchor: string | null }) {
   const href = evidenceHref(caseId, source);
   return (
     <div className="min-w-0 rounded-lg border border-border bg-surface p-3">
@@ -20,12 +21,12 @@ function Evidence({ caseId, source, label, value }: { caseId: string; source: So
       <p className="mt-1 text-sm font-semibold">{value}</p>
       <p className="mt-2 break-words text-xs text-muted">{source.sourceLabel}</p>
       {(source.excerpt || source.locator) && <p className="mt-1 line-clamp-2 break-words text-xs text-muted">{source.excerpt || source.locator}</p>}
-      {href ? <a href={href} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-primary underline-offset-2 hover:underline">View Evidence <ExternalLink className="size-3" aria-hidden="true" /></a> : <a href="#receiving-heading" className="mt-2 inline-block text-xs font-semibold text-primary underline-offset-2 hover:underline">Review confirmed counts</a>}
+      {href ? <a href={href} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-primary underline-offset-2 hover:underline">View Evidence <ExternalLink className="size-3" aria-hidden="true" /></a> : receivingAnchor ? <a href={receivingAnchor} className="mt-2 inline-block text-xs font-semibold text-primary underline-offset-2 hover:underline">Review confirmed counts</a> : <p className="mt-2 text-xs text-muted">Merchant-confirmed form entry</p>}
     </div>
   );
 }
 
-function DiscrepancyCard({ caseId, item }: { caseId: string; item: Discrepancy }) {
+function DiscrepancyCard({ caseId, item, receivingAnchor }: { caseId: string; item: Discrepancy; receivingAnchor: string | null }) {
   const display = presentDiscrepancy(item);
   return (
     <article className="rounded-2xl border border-border bg-surface p-5 shadow-sm sm:p-6">
@@ -34,16 +35,16 @@ function DiscrepancyCard({ caseId, item }: { caseId: string; item: Discrepancy }
         <p className="font-mono text-xl font-semibold tabular-nums">{formatPaise(BigInt(item.amountPaise))}</p>
       </div>
       <div className="mt-4 grid gap-3 md:grid-cols-3">
-        <Evidence caseId={caseId} source={item.promisedEvidence} label="Promised" value={display.promised} />
-        <Evidence caseId={caseId} source={item.billedEvidence} label="Billed" value={display.billed} />
-        <Evidence caseId={caseId} source={item.receivedEvidence} label="Received" value={display.received} />
+        <Evidence caseId={caseId} source={item.promisedEvidence} label="Promised" value={display.promised} receivingAnchor={receivingAnchor} />
+        <Evidence caseId={caseId} source={item.billedEvidence} label="Billed" value={display.billed} receivingAnchor={receivingAnchor} />
+        <Evidence caseId={caseId} source={item.receivedEvidence} label="Received" value={display.received} receivingAnchor={receivingAnchor} />
       </div>
       <p className="mt-4 rounded-lg bg-surface-soft p-3 font-mono text-xs leading-5 text-foreground">{display.formula}</p>
     </article>
   );
 }
 
-function ActionTimeline({ caseId, outcome }: { caseId: string; outcome: Result["outcome"] }) {
+function ActionTimeline({ caseId, outcome, approvalPending = false }: { caseId: string; outcome: Result["outcome"]; approvalPending?: boolean }) {
   const [events, setEvents] = useState<VisibleEvent[] | null>(null);
   const [error, setError] = useState(false);
   useEffect(() => {
@@ -58,20 +59,21 @@ function ActionTimeline({ caseId, outcome }: { caseId: string; outcome: Result["
       <p className="mt-1 text-sm text-muted">Recorded operational steps for this delivery.</p>
       {events === null && !error && <p role="status" className="mt-4 text-sm text-muted">Loading recorded actions…</p>}
       {error && <p role="alert" className="mt-4 text-sm text-warning">Recorded actions are temporarily unavailable. Your saved result remains visible.</p>}
-      {events && <ol className="mt-5 space-y-4">{events.map((event) => <li key={event.id} className="flex items-start gap-3 text-sm"><CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" /><div><p className="font-medium">{event.label}</p><time dateTime={event.createdAt} className="text-xs text-muted">{new Date(event.createdAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}</time></div></li>)}{outcome === "discrepancy" && !events.some((event) => event.label === "Waiting for merchant approval") && <li className="flex items-center gap-3 text-sm text-muted"><span className="ml-1 size-2 rounded-full border border-warning" />Next: merchant approval before any supplier message</li>}</ol>}
+      {events && <ol className="mt-5 space-y-4">{events.map((event) => <li key={event.id} className="flex items-start gap-3 text-sm"><CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" /><div><p className="font-medium">{event.label}</p><time dateTime={event.createdAt} className="text-xs text-muted">{new Date(event.createdAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })}</time></div></li>)}{approvalPending && outcome === "discrepancy" && !events.some((event) => event.label === "Waiting for merchant approval") && <li className="flex items-center gap-3 text-sm text-muted"><span className="ml-1 size-2 rounded-full border border-warning" />Next: merchant approval before any supplier message</li>}</ol>}
       {events?.length === 0 && <p className="mt-4 text-sm text-muted">No recorded actions yet.</p>}
     </section>
   );
 }
 
-export function DiscrepancyResult({ caseId, result }: { caseId: string; result: Result }) {
+export function DiscrepancyResult({ caseId, result, approvalPending = true, showCaseLink = true, receivingAnchor = "#receiving-heading" }: { caseId: string; result: Result; approvalPending?: boolean; showCaseLink?: boolean; receivingAnchor?: string | null }) {
   if (result.outcome === "needs_confirmation") return <section role="status" className="rounded-2xl border border-warning/20 bg-warning-soft p-5"><h2 className="font-semibold">More confirmation needed</h2><p className="mt-2 text-sm">{result.message}</p><ul className="mt-3 list-disc space-y-1 pl-5 text-sm">{result.confirmations.map((item, index) => <li key={index}>{item.reason}</li>)}</ul></section>;
   if (result.outcome === "clean") return <div className="space-y-5"><section role="status" className="rounded-2xl border border-primary/20 bg-success-soft p-6"><ShieldCheck className="size-8 text-primary" aria-hidden="true" /><h2 className="mt-3 text-xl font-semibold">Delivery looks correct. No claim required.</h2><p className="mt-2 text-sm text-muted">The confirmed promise, invoice and receiving counts agree.</p></section><ActionTimeline caseId={caseId} outcome="clean" /></div>;
   return (
     <div className="space-y-5">
-      <section role="status" className="rounded-2xl border border-warning/20 bg-warning-soft p-6"><div className="flex items-start gap-3"><FileSearch className="mt-0.5 size-6 shrink-0 text-warning" aria-hidden="true" /><div><h2 className="text-xl font-semibold">{result.discrepancies.length} source-grounded {result.discrepancies.length === 1 ? "difference" : "differences"} found</h2><p className="mt-1 text-sm text-muted">Potential recovery: <strong className="font-mono text-foreground">{formatPaise(BigInt(result.totalPotentialRecoveryPaise))}</strong>. Check the evidence below before approving any claim.</p></div></div></section>
-      <section aria-label="Discrepancies" className="space-y-4">{result.discrepancies.map((item) => <DiscrepancyCard key={item.id} caseId={caseId} item={item} />)}</section>
-      <ActionTimeline caseId={caseId} outcome="discrepancy" />
+      <section role="status" className="rounded-2xl border border-warning/20 bg-warning-soft p-6"><div className="flex items-start gap-3"><FileSearch className="mt-0.5 size-6 shrink-0 text-warning" aria-hidden="true" /><div><h2 className="text-xl font-semibold">{result.discrepancies.length} source-grounded {result.discrepancies.length === 1 ? "difference" : "differences"} found</h2><p className="mt-1 text-sm text-muted">Potential recovery: <strong className="font-mono text-foreground">{formatPaise(BigInt(result.totalPotentialRecoveryPaise))}</strong>. {approvalPending ? "Check the evidence below before approving any claim." : "The original evidence remains available while recovery is tracked."}</p></div></div></section>
+      {approvalPending && showCaseLink && <Link href={`/app/cases/${caseId}`} className="inline-flex min-h-11 items-center rounded-lg bg-primary px-4 text-sm font-semibold text-white hover:opacity-90">Review case and approve</Link>}
+      <section aria-label="Discrepancies" className="space-y-4">{result.discrepancies.map((item) => <DiscrepancyCard key={item.id} caseId={caseId} item={item} receivingAnchor={receivingAnchor} />)}</section>
+      <ActionTimeline caseId={caseId} outcome="discrepancy" approvalPending={approvalPending} />
     </div>
   );
 }
