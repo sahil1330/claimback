@@ -46,9 +46,22 @@ export function createAgentTools(context: ToolContext) {
       execute: () => runCaseTool(context, "inspect_case", () => inspectCase(context.caseId)),
     }),
     reconcileCase: tool({
-      description: "Reconcile stored, merchant-confirmed invoice, agreement, and receiving facts with deterministic code. Never provide monetary inputs.",
+      description: "Run the first deterministic reconciliation only while the case is EVIDENCE_CAPTURED. For an already reconciled case, return its persisted result without changing it. Never provide monetary inputs.",
       inputSchema: z.object({}),
-      execute: () => runCaseTool(context, "reconcile_case", () => reconcileStoredCase(context.caseId)),
+      execute: async () => {
+        const inspection = await runCaseTool(context, "inspect_case", () => inspectCase(context.caseId));
+        if (!inspection.ok) return inspection;
+        if (inspection.result.status !== "EVIDENCE_CAPTURED") {
+          return {
+            ok: true as const,
+            result: {
+              action: inspection.result.status === "DRAFT" ? "await_evidence" as const : "already_reconciled" as const,
+              case: inspection.result,
+            },
+          };
+        }
+        return runCaseTool(context, "reconcile_case", () => reconcileStoredCase(context.caseId));
+      },
     }),
     createClaim: tool({
       description: "Build an evidence-grounded draft claim from persisted discrepancies and wait for merchant approval.",
