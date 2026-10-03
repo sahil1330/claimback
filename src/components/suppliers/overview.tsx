@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { ArrowRight, Clock3, PackageSearch, Truck } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { formatPaise, formatRate, type SupplierSummary } from "@/components/dashboard/metrics";
+import { formatPaise, formatRate } from "@/components/dashboard/metrics";
+import type { SupplierMetrics } from "@/lib/suppliers/metrics";
 
 function HistoryValue({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
@@ -13,7 +14,7 @@ function HistoryValue({ label, value, hint }: { label: string; value: string; hi
   );
 }
 
-export function SuppliersOverview({ suppliers }: { suppliers: SupplierSummary[] }) {
+export function SuppliersOverview({ suppliers }: { suppliers: SupplierMetrics[] }) {
   const withHistory = suppliers.filter((item) => item.deliveryCount > 0).length;
 
   return (
