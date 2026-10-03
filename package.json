@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "db:migrate": "node --env-file=.env.local scripts/apply-migration.mjs",
+    "db:verify": "node --env-file=.env.local scripts/verify-foundation.mjs",
     "demo:user": "node --env-file=.env.local scripts/provision-demo-user.mjs"
   },
   "dependencies": {

@@ -36,7 +36,9 @@ Keep model IDs in environment variables, not scattered through source code.
    `DEMO_USER_PASSWORD` locally, then run `pnpm demo:user`. This creates or
    updates a confirmed Sharma Medical demo account and verifies password sign-in
    without sending a confirmation email.
-4. Run `pnpm dev`. Never commit `.env.local` or the demo password.
+4. Run `pnpm db:verify` for live case, storage and financial-write isolation.
+   The check creates disposable test data and removes it before exiting.
+5. Run `pnpm dev`. Never commit `.env.local` or the demo password.
 
 The browser auth client is `src/lib/supabase/client.ts` (`createClient()`);
 use `auth.signInWithPassword`, `auth.signUp`, and `auth.signOut` from it in the
