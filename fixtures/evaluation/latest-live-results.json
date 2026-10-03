@@ -1,0 +1,113 @@
+{
+  "dataset": {
+    "casesAvailable": 25,
+    "casesAttempted": 3,
+    "selectedIds": [
+      "C01",
+      "N01",
+      "R01"
+    ],
+    "synthetic": true
+  },
+  "model": "gpt-6.1-sol",
+  "invoice": {
+    "status": {
+      "ready": 0,
+      "needsConfirmation": 3,
+      "error": 0
+    },
+    "fields": {
+      "correct": 15,
+      "total": 15
+    }
+  },
+  "agreement": {
+    "status": {
+      "ready": 2,
+      "needsConfirmation": 1,
+      "error": 0
+    },
+    "fields": {
+      "correct": 15,
+      "total": 15
+    }
+  },
+  "totalCalls": 6,
+  "results": [
+    {
+      "caseId": "C01",
+      "invoice": {
+        "status": "needs_confirmation",
+        "errorCode": null,
+        "confirmations": 3,
+        "fields": {
+          "correct": 5,
+          "total": 5,
+          "failures": []
+        }
+      },
+      "agreement": {
+        "status": "needs_confirmation",
+        "errorCode": null,
+        "confirmations": 1,
+        "fields": {
+          "correct": 5,
+          "total": 5,
+          "failures": []
+        }
+      }
+    },
+    {
+      "caseId": "N01",
+      "invoice": {
+        "status": "needs_confirmation",
+        "errorCode": null,
+        "confirmations": 3,
+        "fields": {
+          "correct": 5,
+          "total": 5,
+          "failures": []
+        }
+      },
+      "agreement": {
+        "status": "ready",
+        "errorCode": null,
+        "confirmations": 0,
+        "fields": {
+          "correct": 5,
+          "total": 5,
+          "failures": []
+        }
+      }
+    },
+    {
+      "caseId": "R01",
+      "invoice": {
+        "status": "needs_confirmation",
+        "errorCode": null,
+        "confirmations": 3,
+        "fields": {
+          "correct": 5,
+          "total": 5,
+          "failures": []
+        }
+      },
+      "agreement": {
+        "status": "ready",
+        "errorCode": null,
+        "confirmations": 0,
+        "fields": {
+          "correct": 5,
+          "total": 5,
+          "failures": []
+        }
+      }
+    }
+  ],
+  "scope": [
+    "Actual configured extraction model called on raw synthetic text, once per invoice and supplier promise.",
+    "Five selected fields per document are compared against manually confirmed fixture facts; errors count as incorrect fields.",
+    "Ready and needs-confirmation results both contribute field comparisons, while status counts show whether merchant confirmation remains required.",
+    "This sample does not test image/PDF extraction, receiving parsing, all 25 cases unless selected, or end-to-end claim and recovery behavior."
+  ]
+}

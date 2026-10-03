@@ -38,7 +38,13 @@ Keep model IDs in environment variables, not scattered through source code.
    without sending a confirmation email.
 4. Run `pnpm db:verify` for live case, storage and financial-write isolation.
    The check creates disposable test data and removes it before exiting.
-5. Run `pnpm dev`. Never commit `.env.local` or the demo password.
+5. Apply the recovery migration with `pnpm db:migrate:recovery`, then run
+   `pnpm db:verify:recovery` for the recovery ledger and ownership rules.
+6. Run `pnpm demo:verify-reset` to restore and verify the scripted merchant
+   history three times. Use `pnpm eval` for the 25-case deterministic benchmark.
+7. Run `pnpm dev`. Never commit `.env.local` or the demo password.
+
+See `docs/DEPLOYMENT.md` for Vercel environment and demo verification steps.
 
 The browser auth client is `src/lib/supabase/client.ts` (`createClient()`);
 use `auth.signInWithPassword`, `auth.signUp`, and `auth.signOut` from it in the
