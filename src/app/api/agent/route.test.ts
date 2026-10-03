@@ -99,6 +99,18 @@ describe("POST /api/agent", () => {
     }));
   });
 
+  it("starts an authenticated pre-case conversation without case tools", async () => {
+    const response = await POST(request({ messages: [userMessage] }));
+
+    expect(response.status).toBe(200);
+    expect(mocks.assertCaseOwnership).not.toHaveBeenCalled();
+    expect(mocks.createClaimBackAgent).toHaveBeenCalledWith({ caseId: null, userId });
+    expect(mocks.createAgentUIStreamResponse).toHaveBeenCalledWith(expect.objectContaining({
+      agent,
+      uiMessages: [userMessage],
+    }));
+  });
+
   it("rejects a request without a final user text message", async () => {
     const response = await POST(request({
       caseId,
