@@ -28,7 +28,7 @@ describe.skipIf(process.env.DEMO_LIVE_VERIFY !== "true")("live demo reset", () =
   it("restores stable, merchant-visible money, obligations and source files three times", async () => {
     let firstIds;
     for (let attempt = 0; attempt < 3; attempt++) {
-      const summary = await resetDemoForCurrentMerchant();
+      const summary = await resetDemoForCurrentMerchant({ allowActiveCaseDeletion: true });
       expect(summary).toMatchObject({ suppliers: 2, historicalResolvedCases: 3,
         activeObligations: 1, marginProtectedPaise: 1_086_000,
         pendingRecoveryPaise: 156_000, openClaims: 3, syntheticDemoHistory: true });
