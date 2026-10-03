@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatPaise } from "@/components/dashboard/metrics";
 import type { AgreementFacts, InvoiceFacts, ReceivingFacts } from "@/types/domain";
+import { DiscrepancyResult } from "@/components/claims/discrepancy-result";
 import {
   createReceivingCase,
   extractAgreement,
@@ -203,7 +204,7 @@ export function ReceiveStock() {
           <div className="mt-5"><ProcessButton busy={busy === "reconcile"} disabled={!invoice || !agreement || Boolean(busy) || completed} onClick={runReconciliation}>Check delivery <ArrowRight aria-hidden="true" /></ProcessButton></div>
         </section>
       </div>
-      {result && <section role="status" aria-live="polite" className={`rounded-2xl border p-5 sm:p-6 ${result.outcome === "clean" ? "border-primary/20 bg-success-soft" : result.outcome === "discrepancy" ? "border-warning/20 bg-warning-soft" : "border-border bg-surface"}`}><h2 className="text-lg font-semibold">{result.outcome === "clean" ? "Delivery looks correct" : result.outcome === "discrepancy" ? "Differences found" : "More confirmation needed"}</h2><p className="mt-2 text-sm leading-6">{result.message}</p>{result.outcome === "discrepancy" && <p className="mt-3 text-sm font-semibold">{result.discrepancies.length} source-linked {result.discrepancies.length === 1 ? "difference" : "differences"} saved for evidence review and merchant approval.</p>}{result.outcome === "needs_confirmation" && <ul className="mt-3 list-disc space-y-1 pl-5 text-sm">{result.confirmations.map((item, index) => <li key={index}>{item.reason}</li>)}</ul>}</section>}
+      {caseId && result && <DiscrepancyResult caseId={caseId} result={result} />}
     </div>
   );
 }
