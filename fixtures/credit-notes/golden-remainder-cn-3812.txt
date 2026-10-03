@@ -1,0 +1,10 @@
+SYNTHETIC DEMO CREDIT NOTE — NOT A REAL FINANCIAL DOCUMENT
+NORTH STAR PHARMA DISTRIBUTORS
+Issued Credit Note CN-3812-REMAINDER
+Issue date: 08 October 2026
+Customer: Sharma Medical
+Against invoice: INV-3812
+
+Posted remaining credit after partial note CN-3812-PART.
+Total credit issued and posted: ₹2,218.00
+This is an issued credit note, not a future promise.
