@@ -126,7 +126,7 @@ export function ReceiveStock() {
       const artifact = await uploadReceivingEvidence(id, "invoice", invoiceFile);
       const extracted = await extractInvoice(id, artifact.artifactId);
       setInvoiceResult(extracted);
-      setAgreementResult(null); setDrafts([]); setReceivingResult(null); setSuggestionMessage(null);
+      setAgreementResult(null); setDrafts([]); setSuggestedFields(new Set()); setReceivingResult(null); setSuggestionMessage(null);
       if (extracted.status === "ready") setStep(1);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not process the invoice. Retry with a clearer file.");
@@ -145,6 +145,7 @@ export function ReceiveStock() {
       setAgreementResult(extracted);
       if (extracted.status === "ready") {
         setDrafts(initialReceivingDrafts(invoice, extracted.facts));
+        setSuggestedFields(new Set());
         setStep(2);
       }
     } catch (cause) {
@@ -159,7 +160,7 @@ export function ReceiveStock() {
       const confirmed = await confirmInvoiceSource(caseId, invoiceResult.facts.source.sourceArtifactId, submission);
       setInvoiceResult(confirmed);
       if (confirmed.status === "ready") {
-        setAgreementResult(null); setDrafts([]); setReceivingResult(null); setSuggestionMessage(null);
+        setAgreementResult(null); setDrafts([]); setSuggestedFields(new Set()); setReceivingResult(null); setSuggestionMessage(null);
         setStep(1);
       } else if (confirmed.status === "error") throw new Error(confirmed.error.message);
     } finally { setBusy(null); }
@@ -173,6 +174,7 @@ export function ReceiveStock() {
       setAgreementResult(confirmed);
       if (confirmed.status === "ready") {
         setDrafts(initialReceivingDrafts(invoice, confirmed.facts));
+        setSuggestedFields(new Set());
         setReceivingResult(null); setSuggestionMessage(null); setCountsConfirmed(false);
         setStep(2);
       } else if (confirmed.status === "error") throw new Error(confirmed.error.message);
