@@ -42,32 +42,6 @@ export type DashboardSummary = {
   attentionCases: CaseHistory[];
 };
 
-export type SupplierSummary = {
-  id: string;
-  name: string;
-  deliveryCount: number;
-  discrepancyCount: number;
-  cleanDeliveryRate: number | null;
-  discrepancyRate: number | null;
-  claimedPaise: bigint;
-  recoveredPaise: bigint;
-  pendingRecoveryPaise: bigint;
-  averageResolutionDays: number | null;
-};
-
-const evaluatedStatuses = new Set<CaseStatus>([
-  "NO_DISCREPANCY",
-  "DISCREPANCY_FOUND",
-  "AWAITING_MERCHANT_APPROVAL",
-  "CLAIM_SENT",
-  "AWAITING_SUPPLIER",
-  "SUPPLIER_RESPONDED",
-  "AWAITING_RECOVERY",
-  "RECOVERY_VERIFICATION",
-  "RESOLVED",
-  "ESCALATED",
-]);
-
 const attentionStatuses = new Set<CaseStatus>([
   "DISCREPANCY_FOUND",
   "AWAITING_MERCHANT_APPROVAL",
@@ -111,44 +85,6 @@ export function getDashboardSummary(cases: CaseHistory[]): DashboardSummary {
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       .slice(0, 4),
   };
-}
-
-export function getSupplierSummaries(
-  suppliers: SupplierHistory[],
-  cases: CaseHistory[],
-): SupplierSummary[] {
-  return suppliers.map((supplier) => {
-    const history = cases.filter((item) => item.supplierId === supplier.id);
-    const evaluated = history.filter((item) => evaluatedStatuses.has(item.status));
-    const discrepancyCount = evaluated.filter((item) => item.status !== "NO_DISCREPANCY").length;
-    const resolvedDurations = history
-      .filter((item) => item.status === "RESOLVED" && item.resolvedAt)
-      .map((item) => Date.parse(item.resolvedAt!) - Date.parse(item.createdAt))
-      .filter((duration) => Number.isFinite(duration) && duration >= 0);
-
-    return {
-      id: supplier.id,
-      name: supplier.name,
-      deliveryCount: evaluated.length,
-      discrepancyCount,
-      cleanDeliveryRate: evaluated.length ? (evaluated.length - discrepancyCount) / evaluated.length : null,
-      discrepancyRate: evaluated.length ? discrepancyCount / evaluated.length : null,
-      claimedPaise: history.reduce(
-        (total, item) => total + (item.claimSentAt ? item.potentialRecoveryPaise : BigInt(0)),
-        BigInt(0),
-      ),
-      recoveredPaise: history.reduce((total, item) => total + item.recoveredPaise, BigInt(0)),
-      pendingRecoveryPaise: history.reduce(
-        (total, item) => total + (item.claimSentAt && item.status !== "RESOLVED" ? item.outstandingPaise : BigInt(0)),
-        BigInt(0),
-      ),
-      averageResolutionDays: resolvedDurations.length
-        ? resolvedDurations.reduce((total, duration) => total + duration, 0) /
-          resolvedDurations.length /
-          86_400_000
-        : null,
-    };
-  });
 }
 
 export function formatPaise(amountPaise: bigint): string {

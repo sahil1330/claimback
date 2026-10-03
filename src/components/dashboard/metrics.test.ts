@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   formatPaise,
   getDashboardSummary,
-  getSupplierSummaries,
   type CaseHistory,
 } from "./metrics";
 
@@ -39,18 +38,6 @@ describe("B2 recovery metrics", () => {
     expect(after.recoveredPaise).toBe(BigInt(158400));
     expect(after.pendingRecoveryPaise).toBe(BigInt(0));
     expect(after.openClaims).toBe(0);
-
-    const [supplier] = getSupplierSummaries([{ id: supplierId, name: "North Star Pharma" }], [verifiedCase]);
-    expect(supplier.claimedPaise).toBe(BigInt(158400));
-    expect(supplier.recoveredPaise).toBe(BigInt(158400));
-    expect(supplier.averageResolutionDays).toBe(2);
-  });
-
-  it("does not show a false rate for suppliers without reconciled deliveries", () => {
-    const [supplier] = getSupplierSummaries([{ id: supplierId, name: "North Star Pharma" }], []);
-    expect(supplier.deliveryCount).toBe(0);
-    expect(supplier.cleanDeliveryRate).toBeNull();
-    expect(supplier.discrepancyRate).toBeNull();
   });
 
   it("formats integer paise exactly", () => {
