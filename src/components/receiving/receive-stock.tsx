@@ -20,7 +20,6 @@ import {
 } from "./api";
 import { initialReceivingDrafts, prepareCaseFacts, type ReceivingDraft } from "./prepare-facts";
 import { AgentAssistant } from "./agent-assistant";
-import { VoiceReceivingNote } from "./voice-receiving-note";
 import { SourceConfirmation, type SourceConfirmationSubmission } from "./source-confirmation";
 
 type InvoiceResult = Awaited<ReturnType<typeof extractInvoice>>;
@@ -198,9 +197,11 @@ export function ReceiveStock() {
     }));
     const proposed = new Map<number, ReceivingFacts["lines"][number][]>();
     for (const { line, resolution } of matchFactLines(facts.lines, invoiceCandidates)) {
-      if (resolution.status !== "matched" || line.confidence !== "high" || line.uncertainties.length > 0) continue;
+      if (resolution.status !== "matched" || line.confidence !== "high") continue;
       if (!("receivedQuantity" in line) ||
         [line.receivedQuantity, line.receivedFreeQuantity, line.damagedQuantity].every((value) => value === null)) continue;
+      const uncertainFields = new Set(line.uncertainties.map((item) => item.field));
+      if ([...uncertainFields].some((field) => !["receivedQuantity", "receivedFreeQuantity", "damagedQuantity"].includes(field))) continue;
       const index = Number(resolution.match.candidate.id);
       const list = proposed.get(index) ?? [];
       list.push(line);
@@ -211,9 +212,9 @@ export function ReceiveStock() {
       const suggestion = safe.get(index);
       return suggestion ? {
         ...draft,
-        paid: suggestion.receivedQuantity === null ? draft.paid : String(suggestion.receivedQuantity),
-        free: suggestion.receivedFreeQuantity === null ? draft.free : String(suggestion.receivedFreeQuantity),
-        damaged: suggestion.damagedQuantity === null ? draft.damaged : String(suggestion.damagedQuantity),
+        paid: suggestion.receivedQuantity === null || suggestion.uncertainties.some((item) => item.field === "receivedQuantity") ? draft.paid : String(suggestion.receivedQuantity),
+        free: suggestion.receivedFreeQuantity === null || suggestion.uncertainties.some((item) => item.field === "receivedFreeQuantity") ? draft.free : String(suggestion.receivedFreeQuantity),
+        damaged: suggestion.damagedQuantity === null || suggestion.uncertainties.some((item) => item.field === "damagedQuantity") ? draft.damaged : String(suggestion.damagedQuantity),
       } : draft;
     }));
     setCountsConfirmed(false);
@@ -236,11 +237,11 @@ export function ReceiveStock() {
 
   return (
     <div className="space-y-7">
-      <div><p className="text-xs font-bold uppercase tracking-[0.16em] text-primary">Receive Stock</p><h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Check this delivery, step by step.</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-muted">AI reads the invoice and supplier promise, then helps fill counts from a typed or spoken receiving note. Review every fact before checking the delivery.</p></div>
+      <div><p className="text-xs font-bold uppercase tracking-[0.16em] text-primary">Receive Stock</p><h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Tell ClaimBack what arrived.</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-muted">Start by speaking or typing. Add the invoice and supplier promise as evidence, then confirm the counts before ClaimBack checks the delivery.</p></div>
+      <AgentAssistant caseId={caseId} stage={completed ? "complete" : agreement ? "stock" : invoice ? "promise" : "invoice"} canFill={Boolean(invoice && agreement && !completed)} busy={Boolean(busy)} locked={completed} note={receivingText} onNoteChange={changeReceivingNote} onFill={understandReceiving} onStepChange={setStep} />
       <div className="grid grid-cols-3 gap-2 lg:gap-4" aria-label="Receiving steps">
         {steps.map(({ name, icon: Icon, detail }, index) => <button key={name} type="button" disabled={index > (invoice ? agreement ? 2 : 1 : 0)} onClick={() => setStep(index as Step)} className={`rounded-xl border p-3 text-left transition-colors lg:p-4 ${step === index ? "border-primary bg-success-soft" : "border-border bg-surface"} disabled:opacity-60`}><span className="flex items-center gap-2 text-xs font-semibold sm:text-sm"><Icon className="size-4 shrink-0" aria-hidden="true" /><span>{name}</span></span><span className="mt-1 hidden text-xs text-muted lg:block">{detail}</span></button>)}
       </div>
-      <AgentAssistant caseId={caseId} chatReady={completed} canFill={Boolean(invoice && agreement && !completed)} busy={Boolean(busy)} locked={completed} note={receivingText} onNoteChange={changeReceivingNote} onFill={understandReceiving} />
       {error && <div role="alert" className="rounded-xl border border-danger/20 bg-danger-soft p-4 text-sm text-danger">{error}</div>}
       {busy && <p role="status" aria-live="polite" className="inline-flex items-center gap-2 text-sm font-medium text-primary"><LoaderCircle className="size-4 animate-spin" aria-hidden="true" />{busy === "invoice" ? "Uploading and understanding invoice…" : busy === "agreement" ? "Understanding supplier promise…" : busy === "confirmInvoice" || busy === "confirmAgreement" ? "Saving confirmed source facts…" : busy === "receiving" ? "Understanding your receiving note…" : "Checking the three truths…"}</p>}
       <div className="grid items-start gap-5 lg:grid-cols-3">
@@ -262,11 +263,9 @@ export function ReceiveStock() {
           <div className="mt-5 space-y-4"><SourceStatus result={agreementResult} label="Supplier promise" />{agreementResult?.status === "needs_confirmation" && caseId && <SourceConfirmation key={agreementResult.facts.source.sourceArtifactId} caseId={caseId} label="Supplier promise" facts={agreementResult.facts} confirmations={agreementResult.confirmations} busy={busy === "confirmAgreement"} onSubmit={confirmAgreement} />}{agreementResult && agreementResult.status !== "error" && <FactLines facts={agreementResult.facts} kind="promise" />}</div>
         </section>
         <section aria-labelledby="receiving-heading" className={`${step === 2 ? "block" : "hidden"} rounded-2xl border border-border bg-surface p-5 shadow-sm lg:block lg:p-6`}>
-          <span className="flex size-10 items-center justify-center rounded-xl bg-success-soft text-primary"><PackageCheck className="size-5" aria-hidden="true" /></span><h2 id="receiving-heading" className="mt-4 text-lg font-semibold">3. Stock received</h2><p className="mt-1 text-sm leading-6 text-muted">Speak or type what arrived. AI can suggest counts, but only you confirm them.</p>
-          <VoiceReceivingNote disabled={!agreement || Boolean(busy) || completed} hasExistingNote={Boolean(receivingText.trim())} onConfirm={changeReceivingNote} />
-          <label className="mt-5 block text-xs font-semibold">Or type a receiving note<textarea className={`${fieldClass} mt-2 min-h-24 py-3`} value={receivingText} disabled={!agreement || Boolean(busy) || completed} maxLength={4000} onChange={(event) => changeReceivingNote(event.target.value)} placeholder="48 boxes arrived, 3 free, 2 damaged" /></label>
-          <div className="mt-3"><ProcessButton busy={busy === "receiving"} disabled={!agreement || !receivingText.trim() || Boolean(busy) || completed} onClick={() => { void understandReceiving(receivingText).catch(() => {}); }}>Suggest counts from note</ProcessButton></div>
-          {receivingResult && <div className="mt-4 rounded-lg bg-surface-soft p-3 text-sm">{receivingResult.status === "error" ? <p role="alert">{receivingResult.error.message} Enter counts manually.</p> : <><p className="font-semibold">Understood from your note</p><ul className="mt-2 space-y-1 text-xs text-muted">{receivingResult.facts.lines.map((line, index) => <li key={index}>{line.rawName}: {line.receivedQuantity ?? "?"} paid, {line.receivedFreeQuantity ?? "?"} free, {line.damagedQuantity ?? "?"} damaged</li>)}</ul>{suggestionMessage && <p className="mt-2 text-xs text-primary">{suggestionMessage}</p>}</>}</div>}
+          <span className="flex size-10 items-center justify-center rounded-xl bg-success-soft text-primary"><PackageCheck className="size-5" aria-hidden="true" /></span><h2 id="receiving-heading" className="mt-4 text-lg font-semibold">3. Confirm stock received</h2><p className="mt-1 text-sm leading-6 text-muted">Review ClaimBack's suggestions against your actual count. You can correct each number here.</p>
+          {receivingText && <p className="mt-4 rounded-lg bg-surface-soft p-3 text-xs leading-5 text-muted">Your note: {receivingText}</p>}
+          {receivingResult && <div className="mt-4 rounded-lg bg-surface-soft p-3 text-sm">{receivingResult.status === "error" ? <p role="alert">{receivingResult.error.message} Enter counts manually.</p> : <><p className="font-semibold">Understood from your note</p><ul className="mt-2 space-y-1 text-xs text-muted">{receivingResult.facts.lines.map((line, index) => <li key={index}>{line.rawName}: {line.receivedQuantity ?? "?"} paid, {line.receivedFreeQuantity ?? "?"} free, {line.damagedQuantity ?? "?"} damaged</li>)}</ul>{receivingResult.facts.lines.flatMap((line) => line.uncertainties).map((item, index) => <p key={index} className="mt-2 text-xs text-warning">Please check {item.field}: {item.reason}</p>)}{suggestionMessage && <p className="mt-2 text-xs text-primary">{suggestionMessage}</p>}</>}</div>}
           {invoice && agreement && <div className="mt-5 space-y-4">{invoice.lines.map((line, index) => { const draft = drafts[index]; if (!draft) return null; const promised = draft.promisedIndex === null ? null : agreement.lines[draft.promisedIndex]; return <div key={`${line.rawName}-${index}`} className="rounded-xl border border-border p-3"><p className="text-sm font-semibold">{line.rawName}</p><label className="mt-3 block text-xs font-semibold">Matches supplier promise<select className={`${fieldClass} mt-1`} value={draft.promisedIndex ?? ""} onChange={(event) => updateDraft(index, { promisedIndex: event.target.value === "" ? null : Number(event.target.value), matchConfirmed: false })}><option value="">Choose a product</option>{agreement.lines.map((option, optionIndex) => <option key={optionIndex} value={optionIndex}>{option.rawName}</option>)}</select></label>{promised && <label className="mt-3 flex items-start gap-2 text-xs text-muted"><input type="checkbox" className="mt-0.5 accent-primary" checked={draft.matchConfirmed} onChange={(event) => updateDraft(index, { matchConfirmed: event.target.checked })} />I confirmed this product match against both documents</label>}<div className="mt-4 grid grid-cols-3 gap-2">{(["paid", "free", "damaged"] as const).map((field) => <label key={field} className="text-xs font-semibold capitalize">{field}<input className={`${fieldClass} mt-1 px-2 font-mono`} inputMode="numeric" pattern="[0-9]*" value={draft[field]} onChange={(event) => updateDraft(index, { [field]: event.target.value })} placeholder={field === "free" && !promised?.scheme ? "—" : "0"} /></label>)}</div></div>; })}</div>}
           {namesDiffer && <label className="mt-4 flex items-start gap-2 rounded-lg bg-warning-soft p-3 text-xs text-warning"><input type="checkbox" className="mt-0.5 accent-primary" checked={supplierConfirmed} onChange={(event) => setSupplierConfirmed(event.target.checked)} />Invoice says “{invoice?.supplierName}” and promise says “{agreement?.supplierName}”. I confirmed these are the same supplier.</label>}
           {invoice && agreement && <label className="mt-4 flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1 accent-primary" checked={countsConfirmed} onChange={(event) => setCountsConfirmed(event.target.checked)} />I counted and confirmed the paid, free and damaged units above.</label>}
