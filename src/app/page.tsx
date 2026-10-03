@@ -128,7 +128,7 @@ export default function Home() {
               <article key={truth.name} className="min-h-48 rounded-[10px] bg-white p-6 text-[#163300]">
                 <div className="flex items-start justify-between gap-3">
                   <p className="text-xs font-black uppercase tracking-[0.16em]">{truth.name}</p>
-                  <span className="font-mono text-xs text-[#868685]">{truth.number}</span>
+                  <span className="font-mono text-xs text-[#555a55]">{truth.number}</span>
                 </div>
                 <p className="mt-9 text-4xl font-black tracking-[-0.06em] sm:text-5xl">{truth.value}</p>
                 <p className="mt-2 text-sm text-[#454745]">{truth.detail}</p>
@@ -171,7 +171,7 @@ export default function Home() {
               <article key={step.title} className="border-t border-[#163300] pt-6">
                 <div className="flex items-start justify-between">
                   <step.icon className="size-7 text-[#163300]" strokeWidth={1.8} aria-hidden="true" />
-                  <span className="font-mono text-sm text-[#868685]">{step.number}</span>
+                  <span className="font-mono text-sm text-[#555a55]">{step.number}</span>
                 </div>
                 <h3 className="mt-8 max-w-[13ch] text-2xl font-bold leading-tight tracking-[-0.035em] text-[#0e0f0c]">{step.title}</h3>
                 <p className="mt-3 max-w-sm text-sm leading-7 text-[#6a6c6a]">{step.body}</p>
@@ -227,7 +227,7 @@ export default function Home() {
                 </li>
               ))}
             </ol>
-            <p className="mt-7 rounded-[10px] bg-[#e8ebe6] p-3 text-xs leading-5 text-[#6a6c6a]">
+            <p className="mt-7 rounded-[10px] bg-[#e8ebe6] p-3 text-xs leading-5 text-[#555a55]">
               Illustrative completed path using synthetic evidence. The live product verifies posted recovery before closing.
             </p>
           </div>

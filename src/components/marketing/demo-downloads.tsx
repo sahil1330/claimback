@@ -31,14 +31,14 @@ export function DemoDownloads() {
               className="group flex min-h-48 flex-col justify-between rounded-[10px] bg-[#e8ebe6] p-5 transition-colors hover:bg-[#e2f6d5]"
             >
               <div className="flex items-start justify-between gap-3">
-                <span className="font-mono text-xs text-[#6a6c6a]">0{index + 1}</span>
+                <span className="font-mono text-xs text-[#555a55]">0{index + 1}</span>
                 <span className="flex size-9 items-center justify-center rounded-full border border-[#163300] transition-colors group-hover:bg-[#163300] group-hover:text-[#9fe870]">
                   <ArrowDownToLine className="size-4" aria-hidden="true" />
                 </span>
               </div>
               <div>
                 <span className="block text-lg font-bold tracking-[-0.03em]">{file.label}</span>
-                <span className="mt-1 block text-xs leading-5 text-[#6a6c6a]">{file.detail}</span>
+                <span className="mt-1 block text-xs leading-5 text-[#555a55]">{file.detail}</span>
               </div>
             </a>
           ))}
