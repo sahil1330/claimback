@@ -52,6 +52,7 @@ export const receivingModelSchema = z.object({
   evidence: modelEvidenceSchema,
   lines: z.array(modelLineBaseSchema.extend({
     receivedQuantity: z.number().int().nonnegative().nullable(),
+    receivedFreeQuantity: z.number().int().nonnegative().nullable(),
     damagedQuantity: z.number().int().nonnegative().nullable(),
   })),
   uncertainties: z.array(modelUncertaintySchema),

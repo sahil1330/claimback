@@ -221,7 +221,8 @@ export function normalizeReceivingOutput(raw: unknown, sourceInput: ExtractionSo
     return {
       rawName: line.rawName.trim(), skuRef: line.skuRef?.trim() || null,
       unit: line.unit?.trim() || null, packSize: line.packSize?.trim() || null,
-      receivedQuantity: line.receivedQuantity, damagedQuantity: line.damagedQuantity,
+      receivedQuantity: line.receivedQuantity, receivedFreeQuantity: line.receivedFreeQuantity,
+      damagedQuantity: line.damagedQuantity,
       merchantConfirmed: false, source: lineSource, confidence: line.confidence,
       uncertainties: lineUncertainties,
     };
@@ -248,6 +249,7 @@ export const confirmedReceivingInputSchema = z.object({
     unit: z.string().nullable(),
     packSize: z.string().nullable(),
     receivedQuantity: z.number().int().nonnegative(),
+    receivedFreeQuantity: z.number().int().nonnegative().nullable(),
     damagedQuantity: z.number().int().nonnegative(),
   }).refine((line) => line.damagedQuantity <= line.receivedQuantity, {
     message: "Damaged quantity cannot exceed received quantity",
