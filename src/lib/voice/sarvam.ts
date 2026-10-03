@@ -16,6 +16,7 @@ const ttsLanguages = [
 export const speechRequestSchema = z.object({
   text: z.string().trim().min(1).max(MAX_SPEECH_TEXT_CHARS),
   languageCode: z.enum(ttsLanguages).default("hi-IN"),
+  translateFromEnglish: z.boolean().optional(),
 });
 
 const transcriptionResponseSchema = z.object({
@@ -26,6 +27,7 @@ const transcriptionResponseSchema = z.object({
 const speechResponseSchema = z.object({
   audios: z.array(z.base64().min(1).max(12_000_000)).length(1),
 });
+const translationResponseSchema = z.object({ translated_text: z.string().trim().min(1).max(MAX_SPEECH_TEXT_CHARS) });
 
 const supportedAudioTypes = new Set([
   "audio/webm", "audio/wav", "audio/x-wav", "audio/wave",
@@ -155,10 +157,23 @@ export async function synthesizeSpeech(
   fetcher: typeof fetch = fetch,
 ): Promise<{ audioBase64: string; mimeType: "audio/wav"; source: "sarvam" }> {
   const validated = speechRequestSchema.parse(input);
+  let spokenText = validated.text;
+  if (validated.translateFromEnglish && validated.languageCode !== "en-IN") {
+    const translation = await callProvider(
+      "/translate",
+      JSON.stringify({ input: validated.text, source_language_code: "en-IN", target_language_code: validated.languageCode, model: "mayura:v1", mode: "modern-colloquial" }),
+      "application/json",
+      requestSignal,
+      fetcher,
+    );
+    const parsedTranslation = translationResponseSchema.safeParse(translation);
+    if (!parsedTranslation.success) throw new VoiceServiceError("VOICE_INVALID_RESPONSE", "Voice translation was unavailable", true);
+    spokenText = parsedTranslation.data.translated_text;
+  }
   const raw = await callProvider(
     "/text-to-speech",
     JSON.stringify({
-      text: validated.text,
+      text: spokenText,
       language_code: validated.languageCode,
       model: "bulbul:v3",
       output_audio_codec: "wav",

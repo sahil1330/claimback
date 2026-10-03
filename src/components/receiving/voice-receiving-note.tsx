@@ -8,7 +8,7 @@ type VoiceState = "idle" | "recording" | "transcribing";
 const preferredMimeTypes = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg"];
 
 /** The transcript lands in the ordinary composer for editing before it is sent. */
-export function VoiceReceivingNote({ disabled, onConfirm }: { disabled: boolean; onConfirm: (transcript: string) => void }) {
+export function VoiceReceivingNote({ disabled, onConfirm }: { disabled: boolean; onConfirm: (transcript: string, languageCode: string | null) => void }) {
   const [state, setState] = useState<VoiceState>("idle");
   const [error, setError] = useState<string | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
@@ -33,7 +33,7 @@ export function VoiceReceivingNote({ disabled, onConfirm }: { disabled: boolean;
     requestRef.current = controller;
     try {
       const result = await transcribeReceivingAudio(file, controller.signal);
-      onConfirm(result.transcript);
+      onConfirm(result.transcript, result.languageCode);
     } catch (cause) {
       if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : "Voice is unavailable. Type your note instead.");
     } finally {

@@ -9,20 +9,45 @@ import { AuthenticationRequiredError, requireMerchant } from "@/lib/auth/session
 export const runtime = "nodejs";
 
 const MAX_REQUEST_CHARS = 65_536;
+const MAX_HISTORY_MESSAGES = 8;
+const MAX_HISTORY_TEXT_CHARS = 4_000;
 const requestSchema = z.object({
   caseId: z.uuid().optional(),
+  languageCode: z.enum(["en-IN", "hi-IN", "bn-IN", "ta-IN", "te-IN", "kn-IN", "ml-IN", "mr-IN", "gu-IN", "pa-IN", "od-IN"]).optional(),
   messages: z.array(z.unknown()).min(1).max(40),
+});
+const textPartSchema = z.object({
+  type: z.literal("text"),
+  text: z.string().max(4_000),
 });
 const userMessageSchema = z.object({
   id: z.string().min(1).max(128),
   role: z.literal("user"),
-  parts: z.array(z.object({
-    type: z.literal("text"),
-    text: z.string().max(4_000),
-  })).min(1).max(5),
+  parts: z.array(textPartSchema).min(1).max(5),
+});
+const historyMessageSchema = z.object({
+  id: z.string().min(1).max(128),
+  role: z.enum(["user", "assistant"]),
+  parts: z.array(z.unknown()).max(100),
 });
 
-/** Client-supplied assistant and tool history cannot establish case facts or approval. */
+/** Prior chat provides continuity, never case facts, approval, or tool results. */
+function sanitizedHistory(messages: unknown[]): UIMessage[] {
+  return messages.slice(-MAX_HISTORY_MESSAGES - 1, -1).flatMap((message) => {
+    const parsed = historyMessageSchema.safeParse(message);
+    if (!parsed.success) return [];
+
+    const text = parsed.data.parts.flatMap((part) => {
+      const result = textPartSchema.safeParse(part);
+      return result.success ? [result.data.text.trim()] : [];
+    }).filter(Boolean).join("\n").slice(0, MAX_HISTORY_TEXT_CHARS);
+    if (!text) return [];
+
+    return [{ id: parsed.data.id, role: parsed.data.role, parts: [{ type: "text" as const, text }] }];
+  });
+}
+
+/** The latest merchant text is mandatory; client tool/approval claims are ignored. */
 function latestMerchantMessage(messages: unknown[]): UIMessage {
   const last = userMessageSchema.parse(messages.at(-1));
   const text = z.string().trim().min(1).max(4_000).parse(
@@ -43,10 +68,10 @@ export async function POST(request: NextRequest) {
     const { supabase, userId } = await requireMerchant();
     if (input.caseId) await assertCaseOwnership(supabase, input.caseId, userId);
 
-    const agent = createClaimBackAgent({ caseId: input.caseId ?? null, userId });
+    const agent = createClaimBackAgent({ caseId: input.caseId ?? null, userId, spokenLanguageCode: input.languageCode });
     return await createAgentUIStreamResponse({
       agent,
-      uiMessages: [merchantMessage],
+      uiMessages: [...sanitizedHistory(input.messages), merchantMessage],
       abortSignal: request.signal,
       sendReasoning: false,
       headers: { "Cache-Control": "no-store" },

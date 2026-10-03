@@ -62,6 +62,17 @@ describe("Sarvam voice provider", () => {
     expect((options?.headers as Record<string, string>)["api-subscription-key"]).toBe("test-secret");
   });
 
+  it("translates a scripted English workflow reply before speaking Hindi", async () => {
+    const fetcher = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ translated_text: "कृपया इनवॉइस भेजें" }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ audios: [wavBase64] }), { status: 200 }));
+
+    await synthesizeSpeech({ text: "Please send the invoice", languageCode: "hi-IN", translateFromEnglish: true }, undefined, fetcher);
+
+    expect(fetcher.mock.calls[0][0]).toBe("https://api.sarvam.ai/translate");
+    expect(JSON.parse(fetcher.mock.calls[1][1]?.body as string)).toMatchObject({ text: "कृपया इनवॉइस भेजें", language_code: "hi-IN" });
+  });
+
   it("does not call the provider when credentials are absent", async () => {
     vi.stubEnv("SARVAM_API_KEY", "");
     const fetcher = vi.fn<typeof fetch>();
