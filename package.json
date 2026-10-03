@@ -10,6 +10,7 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "db:migrate": "node --env-file=.env.local scripts/apply-migration.mjs",
     "demo:user": "node --env-file=.env.local scripts/provision-demo-user.mjs"
   },
   "dependencies": {

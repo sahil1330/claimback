@@ -38,12 +38,6 @@ if (result.error || !result.data.user) {
   throw result.error ?? new Error("Demo user provisioning failed");
 }
 
-const { error: profileError } = await admin.from("profiles").upsert({
-  id: result.data.user.id,
-  business_name: "Sharma Medical",
-});
-if (profileError) throw profileError;
-
 const browserAuth = createClient(url, publishableKey, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
@@ -53,4 +47,12 @@ const { error: loginError } = await browserAuth.auth.signInWithPassword({
 });
 if (loginError) throw loginError;
 
-console.log(`Demo sign-in verified for ${email}`);
+console.log(`Demo password sign-in verified for ${email}`);
+
+const { error: profileError } = await admin.from("profiles").upsert({
+  id: result.data.user.id,
+  business_name: "Sharma Medical",
+});
+if (profileError) throw profileError;
+
+console.log("Sharma Medical profile is ready");

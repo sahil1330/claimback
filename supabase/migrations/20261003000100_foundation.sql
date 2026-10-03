@@ -174,43 +174,41 @@ create policy cases_insert_own on public.cases for insert to authenticated
 with check (user_id = (select auth.uid()));
 create policy cases_update_own on public.cases for update to authenticated
 using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
-create policy cases_delete_own on public.cases for delete to authenticated
-using (user_id = (select auth.uid()));
-
 create policy artifacts_select_own on public.artifacts for select to authenticated
 using (user_id = (select auth.uid()));
 create policy artifacts_insert_own on public.artifacts for insert to authenticated
 with check (user_id = (select auth.uid()));
-create policy artifacts_update_own on public.artifacts for update to authenticated
-using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
-create policy artifacts_delete_own on public.artifacts for delete to authenticated
-using (user_id = (select auth.uid()));
 
 create policy supplier_messages_select_own on public.supplier_messages for select to authenticated
 using (user_id = (select auth.uid()));
-create policy supplier_messages_insert_own on public.supplier_messages for insert to authenticated
-with check (user_id = (select auth.uid()));
 
 create policy recovery_obligations_select_own on public.recovery_obligations for select to authenticated
 using (user_id = (select auth.uid()));
-create policy recovery_obligations_insert_own on public.recovery_obligations for insert to authenticated
-with check (user_id = (select auth.uid()));
-create policy recovery_obligations_update_own on public.recovery_obligations for update to authenticated
-using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
 
--- Case events are append-only to authenticated merchants.
+-- Merchants can read their own history; only trusted server tools append events.
 create policy case_events_select_own on public.case_events for select to authenticated
 using (user_id = (select auth.uid()));
-create policy case_events_insert_own on public.case_events for insert to authenticated
-with check (user_id = (select auth.uid()));
 
 revoke all on public.profiles, public.suppliers, public.cases, public.artifacts,
-  public.supplier_messages, public.recovery_obligations, public.case_events from anon;
-grant select, insert, update on public.profiles to authenticated;
-grant select, insert, update, delete on public.suppliers, public.cases, public.artifacts to authenticated;
-grant select, insert on public.supplier_messages, public.case_events to authenticated;
-grant select, insert, update on public.recovery_obligations to authenticated;
-grant usage, select on sequence public.case_events_id_seq to authenticated;
+  public.supplier_messages, public.recovery_obligations, public.case_events
+  from public, anon, authenticated;
+grant select, insert on public.profiles to authenticated;
+grant update (business_name, business_type, preferred_locale) on public.profiles to authenticated;
+grant select, delete on public.suppliers to authenticated;
+grant insert (id, user_id, name, phone) on public.suppliers to authenticated;
+grant update (name, phone) on public.suppliers to authenticated;
+grant select on public.cases to authenticated;
+grant insert (id, user_id, supplier_id, title) on public.cases to authenticated;
+grant update (title, supplier_id) on public.cases to authenticated;
+grant select on public.artifacts to authenticated;
+grant insert (id, user_id, case_id, type, storage_path, mime_type, original_name)
+  on public.artifacts to authenticated;
+grant select on public.supplier_messages, public.recovery_obligations,
+  public.case_events to authenticated;
+grant all on public.profiles, public.suppliers, public.cases, public.artifacts,
+  public.supplier_messages, public.recovery_obligations, public.case_events
+  to service_role;
+grant usage, select on sequence public.case_events_id_seq to service_role;
 
 -- Evidence is private and scoped to {user_id}/{case_id}/{artifact_id}-{filename}.
 insert into storage.buckets (id, name, public, file_size_limit)
