@@ -45,6 +45,10 @@ const responseSchema = z.object({
   })) }).nullable(),
 });
 type DemoResponse = z.infer<typeof responseSchema>;
+const followupDraftSchema = z.object({
+  id: z.uuid(), body: z.string(), status: z.enum(["awaiting_approval", "sent", "already_sent"]),
+});
+type FollowupDraft = z.infer<typeof followupDraftSchema>;
 
 async function jsonResponse(response: Response): Promise<unknown> {
   const body: unknown = await response.json().catch(() => null);
@@ -109,6 +113,8 @@ export function ReceiveStock() {
   const [scenarios, setScenarios] = useState<z.infer<typeof scenariosSchema>["scenarios"]>([]);
   const [scenarioId, setScenarioId] = useState("");
   const [supplierReply, setSupplierReply] = useState<DemoResponse | null>(null);
+  const [followupDraft, setFollowupDraft] = useState<FollowupDraft | null>(null);
+  const [followupReviewed, setFollowupReviewed] = useState(false);
   const [recoveryHistory, setRecoveryHistory] = useState<RecoveryHistory | null>(null);
   const [recoveryResult, setRecoveryResult] = useState<RecoveryResult | null>(null);
   const [recoveryArtifactId, setRecoveryArtifactId] = useState<string | null>(null);
@@ -160,6 +166,14 @@ export function ReceiveStock() {
     }).catch(() => { if (active) setScenarios([]); });
     return () => { active = false; };
   }, [claimSent]);
+  useEffect(() => {
+    if (!caseId || chatStatus !== "ready") return;
+    let active = true;
+    fetch(`/api/cases/${caseId}/supplier-followup`).then(jsonResponse).then((body) =>
+      z.object({ draft: followupDraftSchema.nullable() }).parse(body).draft,
+    ).then((draft) => { if (active) setFollowupDraft(draft); }).catch(() => {});
+    return () => { active = false; };
+  }, [caseId, chatStatus, messages.length]);
 
   function add(kind: Activity["kind"], text: string, state?: Activity["state"], detail?: string) {
     const id = nextActivityId.current++;
@@ -427,14 +441,45 @@ export function ReceiveStock() {
     } catch (cause) { fail(cause, "Claim could not be sent."); }
     finally { setBusy(null); }
   }
+  async function prepareSupplierCorrection(caseForDraft: string) {
+    const body = await jsonResponse(await fetch(`/api/cases/${caseForDraft}/supplier-followup`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "prepare" }),
+    }));
+    const draft = z.object({ draft: followupDraftSchema }).parse(body).draft;
+    setFollowupDraft(draft);
+    setFollowupReviewed(false);
+    return draft;
+  }
+  async function approveSupplierCorrection() {
+    if (!caseId || !followupDraft || followupDraft.status !== "awaiting_approval" || !followupReviewed) return;
+    setBusy("followup"); setError(null);
+    try {
+      const body = await track("Recording approval and sending the corrected reply", async () => jsonResponse(await fetch(`/api/cases/${caseId}/supplier-followup`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "approve_and_send", draftId: followupDraft.id }),
+      })));
+      setFollowupDraft(z.object({ draft: followupDraftSchema }).parse(body).draft);
+      add("assistant", "I sent your approved correction through the demo supplier transport. I can check the supplier’s next reply now; the case stays open until recovery is verified.");
+    } catch (cause) { fail(cause, "Corrected reply could not be sent."); }
+    finally { setBusy(null); }
+  }
   async function triggerSupplier() {
     if (!caseId || !scenarioId) return;
+    if (followupDraft?.status === "awaiting_approval") {
+      setError("Review and approve the corrected reply before checking the supplier’s next response.");
+      return;
+    }
     setBusy("supplier"); setError(null);
     try {
       const next = await track("Receiving and interpreting a simulated supplier reply", async () => responseSchema.parse(await jsonResponse(await fetch("/api/demo/supplier-response", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ caseId, scenarioId }) }))));
       setSupplierReply(next);
       if (next.response) add("assistant", `Supplier replied: “${next.response.rawBody}”`, "done", next.acknowledgedPaise > 0 ? `${formatPaise(BigInt(next.acknowledgedPaise))} acknowledged; credit still needs verification.` : "No recovery has been verified yet.");
       else add("assistant", "No supplier reply yet. The claim remains open. You can check for another simulated update.");
+      if (next.response?.decisions.some((decision) => decision.outcome === "rejected")) {
+        const draft = await track("Preparing a sourced correction for the rejected item", () => prepareSupplierCorrection(caseId));
+        if (draft.status === "awaiting_approval") add("assistant", "I prepared a corrected reply using the original agreement and invoice. Please review it below; I will wait for your approval before sending it.");
+      }
       const history = await track("Checking outstanding supplier commitments", () => loadRecoveryHistory(caseId));
       setRecoveryHistory(history);
     } catch (cause) { fail(cause, "Supplier response could not be checked."); }
@@ -536,6 +581,7 @@ export function ReceiveStock() {
       <div role="log" aria-label="Delivery progress and messages" aria-live="polite" aria-relevant="additions text" className="max-h-[45vh] min-h-44 space-y-4 overflow-y-auto px-4 py-6 sm:max-h-[min(55vh,600px)] sm:min-h-52 sm:px-8">
         {activities.map((item) => item.kind === "task" ? <div key={item.id} className="ml-10 flex items-start gap-2 text-sm text-muted"><span className="mt-0.5 flex size-5 shrink-0 items-center justify-center">{item.state === "running" ? <LoaderCircle className="size-4 animate-spin text-primary" aria-hidden="true" /> : item.state === "error" ? <X className="size-4 text-danger" aria-hidden="true" /> : <Check className="size-4 text-primary" aria-hidden="true" />}</span><span>{item.text}</span></div> : <div key={item.id} className={`flex ${item.kind === "you" ? "justify-end" : "items-start gap-3"}`}>{item.kind === "assistant" && <span className="mt-1 flex size-8 shrink-0 items-center justify-center rounded-full bg-success-soft text-primary"><Sparkles className="size-4" aria-hidden="true" /></span>}<div className={`max-w-[min(90%,42rem)] rounded-2xl px-4 py-3 text-sm leading-6 ${item.kind === "you" ? "rounded-tr-sm bg-success-soft" : "rounded-tl-sm bg-surface-soft"}`}>{item.state === "running" && <LoaderCircle className="mr-2 inline size-4 animate-spin text-primary" aria-hidden="true" />}<p className="whitespace-pre-wrap">{item.kind === "assistant" ? inlineEmphasis(item.text) : item.text}</p>{item.detail && <p className="mt-2 text-xs text-muted">{item.detail}</p>}{item.id === voiceReplyActivityId && <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-primary">{voiceReplyStatus === "generating" && <><LoaderCircle className="size-3.5 animate-spin" aria-hidden="true" />Preparing voice reply…</>}{voiceReplyStatus === "playing" && <span role="status">Speaking…</span>}{hasAudio && <button type="button" className="inline-flex min-h-8 items-center gap-1 rounded-md px-2 font-semibold hover:bg-primary/10" onClick={() => void replay()} aria-label="Replay ClaimBack voice reply"><Volume2 className="size-4" aria-hidden="true" />Replay</button>}{voiceReplyError && <span role="status" className="text-muted">{voiceReplyError}</span>}</div>}</div></div>)}
         <div ref={feedEndRef} />
+        {claimSent && followupDraft?.status === "awaiting_approval" && <div className="ml-10 rounded-2xl border border-primary/25 bg-success-soft p-4 sm:p-5"><h3 className="font-semibold">Corrected reply ready for your approval</h3><p className="mt-1 text-xs text-muted">This draft cites the rejected claim items and their original sources. Nothing has been sent yet.</p><div className="mt-3 max-h-48 overflow-y-auto whitespace-pre-wrap rounded-lg border border-border bg-surface p-3 text-sm leading-6">{followupDraft.body}</div><label className="mt-4 flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1 accent-primary" checked={followupReviewed} onChange={(event) => setFollowupReviewed(event.target.checked)} />I reviewed this exact corrected message and approve sending it to the demo supplier.</label><Button type="button" className="mt-4" disabled={!followupReviewed || Boolean(busy)} onClick={() => void approveSupplierCorrection()}>{busy === "followup" ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : <Send className="size-4" aria-hidden="true" />}Approve and send correction</Button></div>}
         {invoiceResult?.status === "needs_confirmation" && caseId && <div className="ml-10"><SourceConfirmation key={invoiceResult.facts.source.sourceArtifactId} caseId={caseId} label="Invoice" facts={invoiceResult.facts} confirmations={invoiceResult.confirmations} busy={busy === "confirming"} onSubmit={confirmInvoice} /></div>}
         {agreementResult?.status === "needs_confirmation" && caseId && <div className="ml-10"><SourceConfirmation key={agreementResult.facts.source.sourceArtifactId} caseId={caseId} label="Supplier promise" facts={agreementResult.facts} confirmations={agreementResult.confirmations} busy={busy === "confirming"} onSubmit={confirmAgreement} /></div>}
         {invoice && result?.outcome !== "discrepancy" && <div className="ml-10"><SourceSummary facts={invoice} label="Invoice evidence" /></div>}
@@ -544,7 +590,7 @@ export function ReceiveStock() {
         {invoice && agreement && (!result || result.outcome === "needs_confirmation") && showCountReview && <div className="ml-10 space-y-4 rounded-2xl border border-primary/20 bg-[#f7faf7] p-4 sm:p-5"><div className="flex items-start gap-3"><ShieldCheck className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden="true" /><div><h3 className="font-semibold">Confirm what arrived</h3><p className="mt-1 text-xs leading-5 text-muted">I can suggest counts from your note. You verify each product before I calculate anything.</p></div></div>{receivingResult?.status === "ready" && <p className="rounded-lg bg-surface p-3 text-xs text-muted">Suggestions from your note are marked below. Correct any number that differs from your physical count.</p>}{invoice.lines.map((line, index) => { const draft = drafts[index]; if (!draft) return null; const promised = draft.promisedIndex === null ? null : agreement.lines[draft.promisedIndex]; return <div key={`${line.rawName}-${index}`} className="rounded-xl border border-border bg-surface p-4"><p className="text-sm font-semibold">{line.rawName}</p><label className="mt-3 block text-xs font-semibold">Matching promise<select className={`${fieldClass} mt-1`} value={draft.promisedIndex ?? ""} onChange={(event) => updateDraft(index, { promisedIndex: event.target.value === "" ? null : Number(event.target.value), matchConfirmed: false })}><option value="">Choose product</option>{agreement.lines.map((option, optionIndex) => <option key={optionIndex} value={optionIndex}>{option.rawName}</option>)}</select></label>{promised && <label className="mt-3 flex items-start gap-2 text-xs text-muted"><input type="checkbox" className="mt-0.5 accent-primary" checked={draft.matchConfirmed} onChange={(event) => updateDraft(index, { matchConfirmed: event.target.checked })} />I checked this product match against both sources</label>}<div className="mt-3 grid grid-cols-3 gap-2">{(["paid", "free", "damaged"] as const).map((field) => <label key={field} className="text-xs font-semibold capitalize">{field}{suggestedFields.has(`${index}:${field}`) && <span className="ml-1 text-primary">suggested</span>}<input className={`${fieldClass} mt-1 px-2 font-mono`} inputMode="numeric" pattern="[0-9]*" value={draft[field]} onChange={(event) => updateDraft(index, { [field]: event.target.value })} placeholder="0" /></label>)}</div></div>; })}{namesDiffer && <label className="flex items-start gap-2 rounded-lg bg-warning-soft p-3 text-xs text-warning"><input type="checkbox" className="mt-0.5 accent-primary" checked={supplierConfirmed} onChange={(event) => setSupplierConfirmed(event.target.checked)} />Invoice says “{invoice.supplierName}” and promise says “{agreement.supplierName}”. I confirmed they are the same supplier.</label>}<label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1 accent-primary" checked={countsConfirmed} onChange={(event) => setCountsConfirmed(event.target.checked)} />I counted and confirmed the paid, free and damaged units above.</label><Button type="button" disabled={Boolean(busy) || !countsConfirmed} onClick={() => void runReconciliation()}>{busy === "reconcile" && <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />}Check delivery <ArrowRight className="size-4" aria-hidden="true" /></Button></div>}
         {caseId && result && <div className="ml-10"><DiscrepancyResult caseId={caseId} result={result} approvalPending={!claimSent} showCaseLink={false} showTimeline={false} compact receivingAnchor={null} /></div>}
         {phase === "approval" && <div className="ml-10 rounded-2xl border border-primary/25 bg-success-soft p-4 sm:p-5"><p className="font-semibold">Your approval is needed</p><p className="mt-1 text-sm text-muted">The draft uses only the sourced differences above. Nothing goes to the supplier until you approve.</p><label className="mt-4 flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1 accent-primary" checked={reviewedClaim} onChange={(event) => setReviewedClaim(event.target.checked)} />I reviewed the discrepancy amounts and linked evidence.</label><Button type="button" className="mt-4" disabled={!reviewedClaim || Boolean(busy)} onClick={() => void approveAndSend()}>{busy === "approval" ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : <Send className="size-4" aria-hidden="true" />}Approve and send claim</Button></div>}
-        {claimSent && !resolved && <div className="ml-10 rounded-2xl border border-border bg-surface p-4 sm:p-5"><div className="flex items-start gap-2"><Bot className="mt-0.5 size-5 text-primary" aria-hidden="true" /><div><h3 className="font-semibold">Demo supplier response</h3><p className="mt-1 text-xs text-muted">Choose a stateful simulated reply. No real supplier is contacted.</p></div></div><div className="mt-4 flex flex-col gap-2 sm:flex-row"><label className="sr-only" htmlFor="supplier-scenario">Supplier response scenario</label><select id="supplier-scenario" className={`${fieldClass} flex-1`} value={scenarioId} onChange={(event) => setScenarioId(event.target.value)} disabled={Boolean(busy)}>{scenarios.length === 0 && <option value="">Loading scenarios…</option>}{scenarios.map((scenario) => <option key={scenario.id} value={scenario.id}>{scenario.name}</option>)}</select><Button type="button" variant="outline" disabled={!scenarioId || Boolean(busy)} onClick={() => void triggerSupplier()}>{busy === "supplier" && <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />}{supplierReply ? "Check next reply" : "Receive demo reply"}</Button></div>{supplierReply?.response && <p className="mt-3 text-xs text-warning">Supplier acceptance is a commitment. Only later evidence can close recovery.</p>}</div>}
+        {claimSent && !resolved && <div className="ml-10 rounded-2xl border border-border bg-surface p-4 sm:p-5"><div className="flex items-start gap-2"><Bot className="mt-0.5 size-5 text-primary" aria-hidden="true" /><div><h3 className="font-semibold">Demo supplier response</h3><p className="mt-1 text-xs text-muted">Choose a stateful simulated reply. No real supplier is contacted.</p></div></div><div className="mt-4 flex flex-col gap-2 sm:flex-row"><label className="sr-only" htmlFor="supplier-scenario">Supplier response scenario</label><select id="supplier-scenario" className={`${fieldClass} flex-1`} value={scenarioId} onChange={(event) => setScenarioId(event.target.value)} disabled={Boolean(busy)}>{scenarios.length === 0 && <option value="">Loading scenarios…</option>}{scenarios.map((scenario) => <option key={scenario.id} value={scenario.id}>{scenario.name}</option>)}</select><Button type="button" variant="outline" disabled={!scenarioId || Boolean(busy) || followupDraft?.status === "awaiting_approval"} onClick={() => void triggerSupplier()}>{busy === "supplier" && <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />}{supplierReply ? "Check next reply" : "Receive demo reply"}</Button></div>{supplierReply?.response && <p className="mt-3 text-xs text-warning">Supplier acceptance is a commitment. Only later evidence can close recovery.</p>}</div>}
         {claimSent && openObligations.length > 0 && !resolved && <div className="ml-10 rounded-2xl border border-warning/20 bg-warning-soft/40 p-4 sm:p-5"><h3 className="font-semibold">Recovery still to verify</h3><p className="mt-1 text-sm text-muted">A promised credit stays open until a later document proves it.</p><ul className="mt-3 space-y-2">{openObligations.map((item) => <li key={item.id} className="rounded-lg border border-border bg-surface p-3 text-sm"><label className="flex items-start gap-2"><input type="checkbox" className="mt-1 accent-primary" checked={selectedObligations.includes(item.id)} onChange={(event) => setSelectedObligations((current) => event.target.checked ? [...current, item.id] : current.filter((id) => id !== item.id))} /><span><strong>{formatPaise(BigInt(item.outstanding_paise))} outstanding</strong><span className="mt-1 block text-xs text-muted">{item.promise_text || "Supplier commitment"}</span></span></label></li>)}</ul><p className="mt-3 text-xs text-muted">Attach a credit note or later invoice in the composer. Select the matching commitment if more than one is open.</p><label className="mt-3 flex items-start gap-2 text-xs"><input type="checkbox" className="mt-0.5 accent-primary" checked={confirmedRecoveryLink} onChange={(event) => setConfirmedRecoveryLink(event.target.checked)} />I confirm this later document belongs to this purchase if it lacks the original invoice reference.</label>{recoveryResult?.status === "needs_confirmation" && <div className="mt-3 rounded-lg bg-surface p-3 text-xs text-warning"><p className="font-semibold">Please confirm before counting credit</p><ul className="mt-1 list-disc pl-4">{recoveryResult.confirmations.map((item) => <li key={item}>{item}</li>)}</ul><Button type="button" size="sm" className="mt-3" disabled={Boolean(busy) || !recoveryArtifactId} onClick={() => void checkRecovery()}>Retry with confirmation</Button></div>}{recoveryResult?.status === "verified" && <p className="mt-3 rounded-lg bg-surface p-3 text-sm">Verified now: <strong>{formatPaise(BigInt(recoveryResult.verification.appliedPaise))}</strong> · still owed: <strong>{formatPaise(BigInt(recoveryResult.verification.outstandingPaise))}</strong></p>}</div>}
         {resolved && <div className="ml-10 flex items-start gap-3 rounded-2xl border border-success/20 bg-success-soft p-5"><CheckCircle2 className="mt-0.5 size-5 text-success" aria-hidden="true" /><div><p className="font-semibold">Case closed after verified recovery</p><p className="mt-1 text-sm text-muted">The evidence and supplier commitment remain in the case record.</p></div></div>}
       </div>

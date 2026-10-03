@@ -7,6 +7,7 @@ import { createAdminClient } from "../../supabase/admin";
 import { appendCaseEvent } from "../../cases/events";
 import { CaseReconciliationError, inspectCase, reconcileStoredCase } from "../../cases/reconcile";
 import { ClaimOperationError, createDraftClaim, sendSupplierMessage } from "../../claims/operations";
+import { prepareSupplierFollowup, SupplierFollowupError } from "../../claims/followup-message";
 import { verifyRecovery } from "../../recovery/verify";
 import { followupReasonSchema, scheduleCaseFollowup, FollowupScheduleError } from "../../followup/schedule";
 
@@ -25,7 +26,7 @@ async function runCaseTool<T>(context: ToolContext, name: string, action: () => 
     });
     return { ok: true as const, result };
   } catch (error) {
-    const message = error instanceof ClaimOperationError || error instanceof CaseReconciliationError || error instanceof FollowupScheduleError
+    const message = error instanceof ClaimOperationError || error instanceof CaseReconciliationError || error instanceof FollowupScheduleError || error instanceof SupplierFollowupError
       ? error.message
       : "This step could not be completed. Please retry or review the case evidence.";
     await appendCaseEvent(admin, {
@@ -72,6 +73,11 @@ export function createAgentTools(context: ToolContext) {
       description: "Send the draft through the demo transport only if merchant approval was recorded by the authenticated approval action.",
       inputSchema: z.object({}),
       execute: () => runCaseTool(context, "send_supplier_message", () => sendSupplierMessage(context.caseId)),
+    }),
+    prepareSupplierFollowup: tool({
+      description: "Prepare an evidence-backed correction after a supplier has rejected a claim item. This creates an unsent draft for the merchant to review. Never approve or send it yourself.",
+      inputSchema: z.object({}),
+      execute: () => runCaseTool(context, "prepare_supplier_followup", () => prepareSupplierFollowup(context.caseId)),
     }),
     verifyRecovery: tool({
       description: "Check a newly uploaded credit note or later invoice against open obligations. Supplier promises alone never count as recovered. A merchant may need to select obligations when several are open.",

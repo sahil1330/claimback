@@ -6,6 +6,7 @@ import { createAdminClient } from "../supabase/admin";
 import { agreementFactsSchema, discrepancySchema, invoiceFactsSchema, receivingFactsSchema } from "../../types/domain";
 import { reconcileCase, reconciliationInputSchema, transitionForReconciliation } from "../reconciliation/engine";
 import { appendCaseEvent } from "./events";
+import { supplierResponseSchema } from "../ai/supplier-response";
 
 const storedCaseSchema = z.object({
   id: z.uuid(),
@@ -28,6 +29,11 @@ const draftExtractionSchema = z.object({
   facts: z.unknown(),
   confirmations: z.array(z.object({ field: z.string(), reason: z.string() })),
 });
+const supplierMessageSchema = z.object({
+  id: z.uuid(), direction: z.enum(["inbound", "outbound"]), body: z.string(),
+  source: z.string().nullable(), parsed: z.unknown().nullable(), created_at: z.string(),
+});
+const analyzedSupplierMessageSchema = z.object({ analysis: supplierResponseSchema });
 
 function evidenceForAgent(row: {
   id: string;
@@ -72,6 +78,11 @@ export async function inspectCase(caseId: string) {
     .eq("case_id", caseId).eq("user_id", userId)
     .order("created_at", { ascending: false }).limit(20);
   if (artifactError) throw artifactError;
+  const { data: rawMessages, error: messageError } = await supabase.from("supplier_messages")
+    .select("id,direction,body,source,parsed,created_at")
+    .eq("case_id", caseId).eq("user_id", userId)
+    .order("created_at", { ascending: false }).limit(10);
+  if (messageError) throw messageError;
   const seenDraftTypes = new Set<string>();
   const evidence = (artifacts ?? []).filter((row) => {
     if (!["invoice", "agreement", "other"].includes(row.type)) return true;
@@ -79,7 +90,17 @@ export async function inspectCase(caseId: string) {
     seenDraftTypes.add(row.type);
     return true;
   }).map(evidenceForAgent);
-  return { ...data, evidence };
+  const supplierMessages = z.array(supplierMessageSchema).parse(rawMessages ?? []).map((message) => {
+    const analysis = analyzedSupplierMessageSchema.safeParse(message.parsed);
+    return {
+      id: message.id, direction: message.direction, body: message.body.slice(0, 1600),
+      status: message.source === "demo_followup_draft" ? "awaiting_merchant_approval"
+        : message.direction === "outbound" ? "sent" : "received",
+      createdAt: message.created_at,
+      decisions: analysis.success ? analysis.data.analysis.decisions : [],
+    };
+  });
+  return { ...data, evidence, supplierMessages };
 }
 
 /** Recompute from stored, merchant-confirmed groups; the caller supplies no amounts. */

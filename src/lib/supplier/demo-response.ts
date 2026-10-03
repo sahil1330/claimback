@@ -12,6 +12,7 @@ import { appendCaseEvent } from "../cases/events";
 import { simulateSupplierResponse } from "../demo/supplier-simulator";
 import { supplierScenarioIdSchema, type SupplierScenarioId } from "../demo/scenarios";
 import { parseSupplierResponse, supplierResponseSchema } from "../ai/supplier-response";
+import { followupId } from "../claims/followup-message";
 
 const caseRowSchema = z.object({
   id: z.uuid(), status: z.string(), supplier_id: z.uuid().nullable(),
@@ -132,6 +133,18 @@ export async function triggerDemoSupplierResponse(caseId: string, scenarioId: Su
   const pendingIndex = messages.findIndex((message) => message.parsed === null ||
     storedAnalysisSchema.parse(message.parsed).appliedAt === null);
   const pending = pendingIndex >= 0 ? messages[pendingIndex] : null;
+  if (!pending && messages.length > 0) {
+    const latest = messages[messages.length - 1];
+    const analysis = storedAnalysisSchema.parse(latest.parsed).analysis;
+    if (analysis.decisions.some((decision) => decision.outcome === "rejected")) {
+      const { data: correction, error: correctionError } = await admin.from("supplier_messages")
+        .select("id").eq("id", followupId(caseId, latest.id))
+        .eq("case_id", caseId).eq("user_id", userId)
+        .eq("direction", "outbound").eq("source", "demo_followup_transport").maybeSingle();
+      if (correctionError) throw correctionError;
+      if (!correction) throw new DemoResponseError("Review and approve the evidence-backed correction before the next demo supplier reply");
+    }
+  }
   const simulated = simulateSupplierResponse({
     scenarioId, caseId, claimMessageId: outbound.id,
     priorInboundCount: pending ? pendingIndex : messages.length, discrepancies: row.discrepancies,
