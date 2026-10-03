@@ -181,22 +181,47 @@ export default function Home() {
             <h2 className="max-w-[14ch] text-[clamp(2.8rem,5.6vw,5.75rem)] font-black leading-[0.95] tracking-[-0.065em] text-[#0e0f0c]">Messy deliveries.<br />Clear answers.</h2>
             <p className="max-w-sm text-base leading-7 text-[#6a6c6a]">From the first invoice to the final verified credit, every step has a purpose.</p>
           </div>
-          <div className="mt-10 grid gap-10 md:grid-cols-3 md:gap-8">
+          <div className="mt-10 grid gap-6 md:grid-cols-3 md:gap-8">
             {steps.map((step, index) => (
-              <article key={step.title} data-marketing-reveal style={{ transitionDelay: index * 70 + "ms" }} className={motionStyles.reveal + " " + motionStyles.lift + " border-t border-[#163300] pt-6"}>
-                <div className="flex items-start justify-between">
-                  <step.icon className="size-7 text-[#163300]" strokeWidth={1.8} aria-hidden="true" />
-                  <span className="font-mono text-sm text-[#555a55]">{step.number}</span>
+              <article
+                key={step.title}
+                data-marketing-reveal
+                style={{ transitionDelay: index * 70 + "ms" }}
+                className={
+                  motionStyles.reveal +
+                  " " +
+                  motionStyles.lift +
+                  " group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-[#e8ebe6] bg-[#f8faf6] p-6 text-[#163300] transition-colors hover:border-[#163300]/30 hover:bg-white sm:p-8"
+                }
+              >
+                <span className="absolute inset-x-0 top-0 h-1 bg-[#163300]" aria-hidden="true" />
+                <div>
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="flex size-12 items-center justify-center rounded-xl bg-[#e2f6d5] text-[#163300] transition-colors group-hover:bg-[#163300] group-hover:text-[#9fe870]">
+                      <step.icon className="size-6" strokeWidth={1.8} aria-hidden="true" />
+                    </span>
+                    <span className="font-mono text-xs font-bold uppercase tracking-wider text-[#555a55]">{step.number}</span>
+                  </div>
+                  <h3 className="mt-8 text-2xl font-bold leading-tight tracking-[-0.035em] text-[#0e0f0c]">{step.title}</h3>
+                  <p className="mt-3 text-sm leading-7 text-[#6a6c6a]">{step.body}</p>
                 </div>
-                <h3 className="mt-8 max-w-[13ch] text-2xl font-bold leading-tight tracking-[-0.035em] text-[#0e0f0c]">{step.title}</h3>
-                <p className="mt-3 max-w-sm text-sm leading-7 text-[#6a6c6a]">{step.body}</p>
               </article>
             ))}
           </div>
-          <p className="mt-10 inline-flex items-center gap-2 rounded-full bg-[#e2f6d5] px-4 py-2 text-xs font-semibold text-[#163300]">
-            <Check className="size-4" aria-hidden="true" />
-            Clean delivery? No claim required.
-          </p>
+          <div
+            data-marketing-reveal
+            className={motionStyles.reveal + " mt-8 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-[#e8ebe6] bg-[#f8faf6] px-5 py-4 sm:px-6"}
+          >
+            <div className="flex items-center gap-2.5">
+              <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-[#163300] text-[#9fe870]">
+                <Check className="size-3.5" strokeWidth={2.5} aria-hidden="true" />
+              </span>
+              <span className="text-sm font-bold text-[#163300]">Clean delivery? No claim required.</span>
+            </div>
+            <p className="text-xs text-[#6a6c6a]">
+              When physical stock matches invoice and agreements, ClaimBack logs verified delivery and never manufactures a claim.
+            </p>
+          </div>
         </div>
       </section>
 

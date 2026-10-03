@@ -1,11 +1,37 @@
-import { ArrowDownToLine } from "lucide-react";
+import {
+  ArrowDownToLine,
+  Banknote,
+  ClipboardCheck,
+  Handshake,
+  ReceiptText,
+} from "lucide-react";
 import motionStyles from "./marketing-motion.module.css";
 
 const files = [
-  { label: "Golden invoice", href: "/demo/golden-invoice.txt", detail: "50 paid boxes at the billed rate" },
-  { label: "Supplier agreement", href: "/demo/golden-supplier-message.txt", detail: "Agreed rate and 10+1 scheme" },
-  { label: "Receiving note", href: "/demo/golden-receiving-note.txt", detail: "Confirm the counts in Receive Stock" },
-  { label: "Posted credit note", href: "/demo/golden-full-credit-note.txt", detail: "Use later, after the supplier reply" },
+  {
+    label: "Golden invoice",
+    href: "/demo/golden-invoice.txt",
+    detail: "50 paid boxes at the billed rate",
+    icon: ReceiptText,
+  },
+  {
+    label: "Supplier agreement",
+    href: "/demo/golden-supplier-message.txt",
+    detail: "Agreed rate and 10+1 scheme",
+    icon: Handshake,
+  },
+  {
+    label: "Receiving note",
+    href: "/demo/golden-receiving-note.txt",
+    detail: "Confirm the counts in Receive Stock",
+    icon: ClipboardCheck,
+  },
+  {
+    label: "Posted credit note",
+    href: "/demo/golden-full-credit-note.txt",
+    detail: "Use later, after the supplier reply",
+    icon: Banknote,
+  },
 ] as const;
 
 export function DemoDownloads() {
@@ -36,12 +62,15 @@ export function DemoDownloads() {
               <div className="flex items-start justify-between gap-3">
                 <span className="font-mono text-xs text-[#555a55]">0{index + 1}</span>
                 <span className="flex size-9 items-center justify-center rounded-full border border-[#163300] transition-colors group-hover:bg-[#163300] group-hover:text-[#9fe870]">
-                  <ArrowDownToLine className="size-4" aria-hidden="true" />
+                  <file.icon className="size-4" aria-hidden="true" />
                 </span>
               </div>
               <div>
                 <span className="block text-lg font-bold tracking-[-0.03em]">{file.label}</span>
                 <span className="mt-1 block text-xs leading-5 text-[#555a55]">{file.detail}</span>
+                <span className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-[#163300]">
+                  Download <ArrowDownToLine className="size-3 transition-transform group-hover:translate-y-0.5" aria-hidden="true" />
+                </span>
               </div>
             </a>
           ))}
