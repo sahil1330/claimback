@@ -114,13 +114,13 @@ export function VoiceReceivingNote({ disabled, hasExistingNote, onConfirm, compa
     <div className={`${compact ? "rounded-xl border border-primary/20 bg-success-soft/40 p-3 sm:p-4" : "mt-4 rounded-xl border border-primary/25 bg-success-soft/60 p-4 sm:p-5"}`} aria-label="Optional voice receiving note">
       <div className="flex items-start gap-3">
         <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary text-white"><Mic className="size-5" aria-hidden="true" /></span>
-        <div><p className="text-sm font-semibold text-foreground">Speak what arrived</p><p className="mt-1 text-xs leading-5 text-muted">Record or upload audio now. Review the transcript before ClaimBack uses your words.</p></div>
+        <div><p className="text-sm font-semibold text-foreground">Speak what arrived</p><p className="mt-1 text-xs leading-5 text-muted">{compact ? "Review the transcript before use." : "Record or upload audio now. Review the transcript before ClaimBack uses your words."}</p></div>
       </div>
       {state !== "review" && <div className="mt-3 flex flex-wrap items-center gap-2">
         {state === "recording" ? (
           <Button type="button" variant="outline" className="min-h-11" onClick={() => { if (recorderRef.current?.state === "recording") recorderRef.current.stop(); }}><Square aria-hidden="true" />Stop & transcribe</Button>
         ) : (
-          <Button type="button" className="min-h-12 w-full justify-center sm:w-auto" disabled={disabled || state === "transcribing"} onClick={startRecording}><Mic aria-hidden="true" />Speak to ClaimBack</Button>
+          <Button type="button" aria-label="Speak to ClaimBack" className={compact ? "min-h-12 flex-1 justify-center" : "min-h-12 w-full justify-center sm:w-auto"} disabled={disabled || state === "transcribing"} onClick={startRecording}><Mic aria-hidden="true" />{compact ? "Speak" : "Speak to ClaimBack"}</Button>
         )}
         <label className={`inline-flex min-h-11 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-xs font-semibold text-foreground ${disabled || state !== "idle" ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}>
           <UploadCloud className="size-4" aria-hidden="true" />Choose audio

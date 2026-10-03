@@ -10,7 +10,7 @@ export const runtime = "nodejs";
 
 const MAX_REQUEST_CHARS = 65_536;
 const requestSchema = z.object({
-  caseId: z.uuid(),
+  caseId: z.uuid().optional(),
   messages: z.array(z.unknown()).min(1).max(40),
 });
 const userMessageSchema = z.object({
@@ -41,9 +41,9 @@ export async function POST(request: NextRequest) {
     const merchantMessage = latestMerchantMessage(input.messages);
 
     const { supabase, userId } = await requireMerchant();
-    await assertCaseOwnership(supabase, input.caseId, userId);
+    if (input.caseId) await assertCaseOwnership(supabase, input.caseId, userId);
 
-    const agent = createClaimBackAgent({ caseId: input.caseId, userId });
+    const agent = createClaimBackAgent({ caseId: input.caseId ?? null, userId });
     return await createAgentUIStreamResponse({
       agent,
       uiMessages: [merchantMessage],
