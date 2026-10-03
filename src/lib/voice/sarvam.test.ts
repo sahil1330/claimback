@@ -34,7 +34,16 @@ describe("Sarvam voice provider", () => {
     expect(form.get("model")).toBe("saaras:v4");
     expect(form.get("mode")).toBe("transcribe");
     expect(form.get("file")).toBeInstanceOf(File);
+    expect((form.get("file") as File).type).toBe("audio/webm");
     expect((options?.headers as Record<string, string>)["Content-Type"]).toBeUndefined();
+  });
+
+  it("removes MediaRecorder codec parameters before forwarding audio", async () => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(JSON.stringify({ transcript: "50 boxes arrived", language_code: "en-IN" }), { status: 200 }));
+    const recorded = new File(["webm bytes"], "recording.webm", { type: "audio/webm;codecs=opus" });
+    await transcribeAudio(recorded, undefined, fetcher);
+    const form = fetcher.mock.calls[0][1]?.body as FormData;
+    expect((form.get("file") as File).type).toBe("audio/webm");
   });
 
   it("sends Bulbul v3 JSON and validates base64 WAV output", async () => {
