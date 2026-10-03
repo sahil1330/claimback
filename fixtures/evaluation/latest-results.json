@@ -1,0 +1,79 @@
+{
+  "dataset": {
+    "cases": 25,
+    "byCategory": {
+      "short": 6,
+      "rate": 5,
+      "scheme": 4,
+      "damage": 3,
+      "combined": 4,
+      "clean": 3
+    },
+    "synthetic": true
+  },
+  "extraction": {
+    "status": "not_run",
+    "reason": "Fixtures contain manually confirmed structured facts; no model call is made.",
+    "invoiceFieldAccuracy": null,
+    "agreementFieldAccuracy": null
+  },
+  "matching": {
+    "correct": 25,
+    "total": 25,
+    "ambiguousDetected": {
+      "correct": 3,
+      "total": 3
+    },
+    "unmatchedDetected": {
+      "correct": 1,
+      "total": 1
+    }
+  },
+  "discrepancies": {
+    "caseOutcomes": {
+      "correct": 25,
+      "total": 25
+    },
+    "exactTypeSets": {
+      "correct": 25,
+      "total": 25
+    },
+    "truePositives": 33,
+    "falsePositives": 0,
+    "falseNegatives": 0,
+    "cleanFalseClaims": 0,
+    "cleanCases": 3
+  },
+  "money": {
+    "correct": 25,
+    "total": 25,
+    "basis": "confirmed_structured_facts"
+  },
+  "sourceGrounding": {
+    "correct": 33,
+    "total": 33
+  },
+  "recoveryAllocationAndState": {
+    "correct": 13,
+    "total": 13,
+    "cases": 9,
+    "missing": {
+      "correct": 4,
+      "total": 4
+    },
+    "partial": {
+      "correct": 3,
+      "total": 3
+    },
+    "full": {
+      "correct": 6,
+      "total": 6
+    }
+  },
+  "failures": [],
+  "scope": [
+    "Production SKU matcher, reconciliation, recovery allocation, and state-transition functions run locally.",
+    "Raw synthetic artifacts are included for future model evaluation, but extraction accuracy is not measured here.",
+    "Recovery figures measure deterministic allocation from assumed posted-credit inputs; model credit extraction, database persistence, and simulator timing are not measured."
+  ]
+}
