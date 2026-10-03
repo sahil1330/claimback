@@ -1,2 +1,12 @@
 allowBuilds:
   unrs-resolver: true
+minimumReleaseAgeExclude:
+  - '@supabase/cli-darwin-arm64@2.120.0-beta.7'
+  - '@supabase/cli-darwin-x64@2.120.0-beta.7'
+  - '@supabase/cli-linux-arm64-musl@2.120.0-beta.7'
+  - '@supabase/cli-linux-arm64@2.120.0-beta.7'
+  - '@supabase/cli-linux-x64-musl@2.120.0-beta.7'
+  - '@supabase/cli-linux-x64@2.120.0-beta.7'
+  - '@supabase/cli-windows-arm64@2.120.0-beta.7'
+  - '@supabase/cli-windows-x64@2.120.0-beta.7'
+  - supabase@2.120.0-beta.7
