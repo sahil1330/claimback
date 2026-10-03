@@ -27,6 +27,22 @@ Copy `.env.example` to `.env.local`.
 
 Keep model IDs in environment variables, not scattered through source code.
 
+## Local foundation setup
+
+1. Run `pnpm install` and fill the Supabase URL and publishable key in `.env.local`.
+2. Apply `supabase/migrations/20261003000100_foundation.sql` to the Supabase project.
+3. Set the server-only `SUPABASE_SECRET_KEY` and dedicated `DEMO_USER_EMAIL` /
+   `DEMO_USER_PASSWORD` locally, then run `pnpm demo:user`. This creates or
+   updates a confirmed Sharma Medical demo account and verifies password sign-in
+   without sending a confirmation email.
+4. Run `pnpm dev`. Never commit `.env.local` or the demo password.
+
+The browser auth client is `src/lib/supabase/client.ts` (`createClient()`);
+use `auth.signInWithPassword`, `auth.signUp`, and `auth.signOut` from it in the
+UI. Server layouts use `requireMerchantPage()` from `src/lib/auth/page.ts`.
+Sensitive server routes use `requireMerchant()` and `assertCaseOwnership()`
+before any case mutation. The Next.js session proxy runs from `src/proxy.ts`.
+
 ## Golden path
 
 The build is not complete until:
