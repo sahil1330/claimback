@@ -8,6 +8,7 @@ import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { formatPaise } from "@/components/dashboard/metrics";
 import { DiscrepancyResult } from "./discrepancy-result";
+import { RecoveryPanel } from "./recovery/recovery-panel";
 import type { CaseView } from "./load-case";
 
 const responseErrorSchema = z.object({ error: z.string() });
@@ -96,6 +97,7 @@ export function CaseWorkspace({ caseView }: { caseView: CaseView }) {
       {caseView.claimSentAt && <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-surface p-5"><div><p className="inline-flex items-center gap-2 text-sm font-semibold"><CheckCircle2 className="size-4 text-primary" aria-hidden="true" />Claim sent after merchant approval</p><p className="mt-1 text-sm text-muted">The supplier transport is simulated for this demo.</p></div><Button asChild variant="outline"><Link href={`/demo/supplier?caseId=${caseView.id}`}>Open demo supplier <ArrowRight aria-hidden="true" /></Link></Button></section>}
       {hasClaim ? <DiscrepancyResult key={`${caseView.status}:${caseView.messages.length}`} caseId={caseView.id} result={{ outcome: "discrepancy", message: "Source-grounded differences", discrepancies: caseView.discrepancies, totalPotentialRecoveryPaise: caseView.potentialRecoveryPaise }} approvalPending={needsApproval} showCaseLink={false} receivingAnchor={null} /> : caseView.status === "NO_DISCREPANCY" ? <DiscrepancyResult caseId={caseView.id} result={{ outcome: "clean", message: "Delivery looks correct. No claim required.", discrepancies: [] }} /> : <section className="rounded-2xl border border-border bg-surface p-6"><h2 className="font-semibold">No confirmed differences yet</h2><p className="mt-2 text-sm text-muted">Capture and confirm invoice, supplier promise and receiving facts before calculating a claim.</p><Button asChild variant="outline" className="mt-4"><Link href="/app/receive">Receive Stock</Link></Button></section>}
       <SupplierReplies caseView={caseView} />
+      {caseView.claimSentAt && <RecoveryPanel caseId={caseView.id} onRecoveryChange={() => router.refresh()} />}
     </div>
   );
 }
