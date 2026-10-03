@@ -1,0 +1,5 @@
+{
+  "id": "golden_partial_credit",
+  "name": "Partial acceptance and next-invoice credit promise",
+  "steps": ["golden_partial_credit", "golden_rate_credit_promise"]
+}

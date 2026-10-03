@@ -1,0 +1,5 @@
+{
+  "id": "reject_rate",
+  "name": "Rate difference rejected",
+  "steps": ["reject_rate", "rate_follow_up"]
+}

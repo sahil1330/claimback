@@ -6,21 +6,31 @@ import { createAdminClient } from "@/lib/supabase/admin";
 const createCaseSchema = z.object({
   title: z.string().trim().min(1).max(160).optional(),
   supplierId: z.uuid().optional(),
+  supplierName: z.string().trim().min(1).max(160).optional(),
+}).refine((value) => !value.supplierId || !value.supplierName, {
+  message: "Choose an existing supplier or enter a new name",
 });
 
 export async function POST(request: NextRequest) {
   try {
     const body = createCaseSchema.parse(await request.json());
     const { supabase, userId } = await requireMerchant();
+    const admin = createAdminClient();
+    let supplierId = body.supplierId ?? null;
     if (body.supplierId) {
       const { data, error } = await supabase.from("suppliers")
         .select("id").eq("id", body.supplierId).eq("user_id", userId).maybeSingle();
       if (error) throw error;
       if (!data) return NextResponse.json({ error: "Supplier not found" }, { status: 404 });
     }
-    const admin = createAdminClient();
+    if (body.supplierName) {
+      const { data, error } = await admin.from("suppliers")
+        .insert({ user_id: userId, name: body.supplierName }).select("id").single();
+      if (error) throw error;
+      supplierId = data.id;
+    }
     const { data, error } = await admin.from("cases")
-      .insert({ user_id: userId, title: body.title ?? "New receiving", supplier_id: body.supplierId ?? null })
+      .insert({ user_id: userId, title: body.title ?? "New receiving", supplier_id: supplierId })
       .select("id, title, status, supplier_id, created_at").single();
     if (error) throw error;
     return NextResponse.json({ case: data }, { status: 201 });
