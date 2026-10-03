@@ -89,6 +89,23 @@ export async function extractReceiving(caseId: string, artifactId: string) {
   return receivingResultSchema.parse(await extract(caseId, artifactId));
 }
 
+type SourceConfirmationSubmission = {
+  acknowledgments: Array<{ field: string; reason: string }>;
+  corrections: Record<string, string | number | { buyQuantity: number; freeQuantity: number } | null>;
+};
+
+async function confirmSource(caseId: string, artifactId: string, submission: SourceConfirmationSubmission): Promise<unknown> {
+  return postJson("/api/evidence/confirm", { caseId, artifactId, ...submission });
+}
+
+export async function confirmInvoiceSource(caseId: string, artifactId: string, submission: SourceConfirmationSubmission) {
+  return invoiceResultSchema.parse(await confirmSource(caseId, artifactId, submission));
+}
+
+export async function confirmAgreementSource(caseId: string, artifactId: string, submission: SourceConfirmationSubmission) {
+  return agreementResultSchema.parse(await confirmSource(caseId, artifactId, submission));
+}
+
 export async function reconcileReceiving(caseId: string, input: ReconciliationInput) {
   await postJson(`/api/cases/${caseId}/facts`, input);
   return reconcileResponseSchema.parse(await postJson(`/api/cases/${caseId}/reconcile`, {}));
