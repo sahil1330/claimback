@@ -11,7 +11,7 @@ Pack size: 10 tablets per strip
 Unit: box
 Paid quantity: 20 boxes
 Unit purchase rate: ₹120.00 per box
-Discount: none
+Discount: ₹0.00
 Line amount: ₹2,400.00
 
 Invoice total: ₹2,400.00

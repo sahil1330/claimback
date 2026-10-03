@@ -11,7 +11,7 @@ Pack size: 70g
 Unit: box
 Paid quantity: 50 boxes
 Unit purchase rate: ₹441.00 per box
-Discount: none
+Discount: ₹0.00
 Line amount: ₹22,050.00
 
 Invoice total: ₹22,050.00
