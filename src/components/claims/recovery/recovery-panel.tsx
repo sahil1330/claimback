@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { CheckCircle2, Clock3, ExternalLink, FileCheck2, FileUp, RefreshCw, ShieldAlert } from "lucide-react";
+import { motion, useReducedMotion } from "motion/react";
 import { Button } from "@/components/ui/button";
 import { formatPaise } from "@/components/dashboard/metrics";
 import {
@@ -63,6 +64,7 @@ function Obligation({ item, checked, onToggle, canSelect }: {
 }
 
 function VerificationResult({ caseId, result }: { caseId: string; result: RecoveryResult }) {
+  const reduceMotion = useReducedMotion();
   if (result.status === "error") {
     return <div role="alert" className="rounded-xl border border-danger/20 bg-danger-soft p-4 text-sm text-danger">{result.error.message} Try a clearer document or retry.</div>;
   }
@@ -86,7 +88,13 @@ function VerificationResult({ caseId, result }: { caseId: string; result: Recove
         : "Credit verified";
   const positive = verification.appliedPaise > 0;
   return (
-    <div role="status" className={`rounded-xl border p-4 ${positive ? "border-success/20 bg-success-soft" : "border-warning/20 bg-warning-soft"}`}>
+    <motion.div
+      role="status"
+      initial={verification.caseState === "RESOLVED" && !reduceMotion ? { y: 4, scale: 0.995 } : false}
+      animate={{ y: 0, scale: 1 }}
+      transition={{ duration: reduceMotion ? 0 : 0.2, ease: "easeOut" }}
+      className={`rounded-xl border p-4 ${positive ? "border-success/20 bg-success-soft" : "border-warning/20 bg-warning-soft"}`}
+    >
       <div className="flex items-start gap-3">
         {positive ? <FileCheck2 className="mt-0.5 size-5 shrink-0 text-success" aria-hidden="true" /> : <Clock3 className="mt-0.5 size-5 shrink-0 text-warning" aria-hidden="true" />}
         <div className="min-w-0">
@@ -98,7 +106,7 @@ function VerificationResult({ caseId, result }: { caseId: string; result: Recove
           <a href={evidenceHref(caseId, verification.artifactId)} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex items-center gap-1 text-xs font-semibold underline-offset-2 hover:underline">View checked evidence <ExternalLink className="size-3" aria-hidden="true" /></a>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
