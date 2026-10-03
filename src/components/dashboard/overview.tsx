@@ -5,6 +5,7 @@ import {
   Clock3,
   FileSearch,
   IndianRupee,
+  Mic,
   PackageCheck,
   ShieldCheck,
 } from "lucide-react";
@@ -118,6 +119,12 @@ export function DashboardOverview({
             <p className="mt-4 max-w-xl text-sm leading-6 text-[#d6e8db]">
               Counted only when recovery is recorded as verified. A supplier promise stays in pending recovery.
             </p>
+            <div className="mt-6 flex flex-wrap items-center gap-3">
+              <Link href="/app/receive" className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-white/30 bg-white/10 px-4 text-sm font-semibold text-white transition-colors hover:bg-white/20">
+                <Mic className="size-4" aria-hidden="true" /> Speak what arrived <ArrowRight className="size-4" aria-hidden="true" />
+              </Link>
+              <p className="max-w-xs text-xs leading-5 text-[#d6e8db]">Add the invoice and supplier promise first, then record or type a note. AI suggests counts for your review.</p>
+            </div>
           </div>
           <Link href="/app/receive" className="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 self-start rounded-lg bg-white px-5 text-sm font-semibold text-[#123f2d] transition-colors hover:bg-[#e5f4ea] lg:self-auto">
             Receive Stock <ArrowRight className="size-4" aria-hidden="true" />
