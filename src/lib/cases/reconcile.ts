@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireMerchant } from "../auth/session";
 import { assertCaseOwnership } from "../auth/case-access";
 import { createAdminClient } from "../supabase/admin";
-import { discrepancySchema } from "../../types/domain";
+import { agreementFactsSchema, discrepancySchema, invoiceFactsSchema, receivingFactsSchema } from "../../types/domain";
 import { reconcileCase, reconciliationInputSchema, transitionForReconciliation } from "../reconciliation/engine";
 import { appendCaseEvent } from "./events";
 
@@ -23,7 +23,42 @@ export class CaseReconciliationError extends Error {
   }
 }
 
-/** Read only merchant-owned facts and deterministic results for case-scoped tools. */
+const draftExtractionSchema = z.object({
+  status: z.enum(["ready", "needs_confirmation"]),
+  facts: z.unknown(),
+  confirmations: z.array(z.object({ field: z.string(), reason: z.string() })),
+});
+
+function evidenceForAgent(row: {
+  id: string;
+  type: string;
+  original_name: string | null;
+  extraction_status: string;
+  extracted: unknown;
+}) {
+  const base = {
+    artifactId: row.id,
+    type: row.type,
+    fileName: row.original_name,
+    extractionStatus: row.extraction_status,
+  };
+  const extraction = draftExtractionSchema.safeParse(row.extracted);
+  if (!extraction.success) return base;
+  const factsSchema = row.type === "invoice" ? invoiceFactsSchema
+    : row.type === "agreement" ? agreementFactsSchema
+      : row.type === "other" ? receivingFactsSchema : null;
+  if (!factsSchema) return base;
+  const facts = factsSchema.safeParse(extraction.data.facts);
+  if (!facts.success) return base;
+  return {
+    ...base,
+    extractionStatus: extraction.data.status,
+    draftFacts: facts.data,
+    confirmationsNeeded: extraction.data.confirmations.map(({ field, reason }) => ({ field, reason })),
+  };
+}
+
+/** Read confirmed case facts and separately labelled draft evidence for case-scoped tools. */
 export async function inspectCase(caseId: string) {
   z.uuid().parse(caseId);
   const { supabase, userId } = await requireMerchant();
@@ -32,7 +67,19 @@ export async function inspectCase(caseId: string) {
     .select("id, title, status, supplier_id, promised, billed, received, discrepancies, potential_recovery_paise, recovered_paise, outstanding_paise, merchant_approved_at, claim_sent_at, next_follow_up_at")
     .eq("id", caseId).eq("user_id", userId).single();
   if (error) throw error;
-  return data;
+  const { data: artifacts, error: artifactError } = await supabase.from("artifacts")
+    .select("id, type, original_name, extraction_status, extracted")
+    .eq("case_id", caseId).eq("user_id", userId)
+    .order("created_at", { ascending: false }).limit(20);
+  if (artifactError) throw artifactError;
+  const seenDraftTypes = new Set<string>();
+  const evidence = (artifacts ?? []).filter((row) => {
+    if (!["invoice", "agreement", "other"].includes(row.type)) return true;
+    if (seenDraftTypes.has(row.type)) return false;
+    seenDraftTypes.add(row.type);
+    return true;
+  }).map(evidenceForAgent);
+  return { ...data, evidence };
 }
 
 /** Recompute from stored, merchant-confirmed groups; the caller supplies no amounts. */
