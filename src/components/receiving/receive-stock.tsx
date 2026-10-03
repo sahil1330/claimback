@@ -340,6 +340,19 @@ export function ReceiveStock() {
     return staged.size;
   }
 
+  function offerCountReview(note: string, voiceLanguage: string | null, extractionFailed: boolean) {
+    const hindi = voiceLanguage === "hi-IN" || /[\u0900-\u097f]/u.test(note);
+    setShowCountReview(true);
+    setInput("");
+    addReply(extractionFailed
+      ? hindi
+        ? "आपका नोट सेव हो गया है, लेकिन मैं उससे गिनती भरोसे से नहीं निकाल पाया। नीचे हर प्रोडक्ट के मिले हुए, फ़्री और खराब बॉक्स भरकर पुष्टि करें।"
+        : "Your note is saved, but I couldn't read its counts reliably. Confirm the received, free and damaged units for each product below."
+      : hindi
+        ? "आपका नोट सेव है। प्रोडक्ट या पेड/फ़्री बॉक्स की गिनती साफ़ नहीं है। नीचे सही प्रोडक्ट और मिले हुए, फ़्री तथा खराब बॉक्स की पुष्टि करें।"
+        : "Your note is saved, but I couldn't confidently link its counts to a product or split paid and free units. Confirm each count below.", voiceLanguage);
+  }
+
   async function processReceivingNote(note: string, voiceLanguage: string | null = null, displayUserMessage = true) {
     if (!caseId || !invoice || !note.trim()) return;
     setBusy("receiving"); setError(null);
@@ -354,13 +367,29 @@ export function ReceiveStock() {
     try {
       const source = new File([note.trim()], "merchant-receiving.txt", { type: "text/plain" });
       const artifact = await track("Saving your receiving note", () => uploadReceivingEvidence(caseId, "other", source));
-      const extracted = await track("Understanding the quantities that arrived", () => extractReceiving(caseId, artifact.artifactId));
-      setReceivingResult(extracted);
-      if (extracted.status === "error") throw new Error(extracted.error.message);
-      const staged = applySuggestions(extracted.facts);
-      setShowCountReview(true);
-      addReply(staged ? `I suggested counts for ${staged} ${staged === 1 ? "product" : "products"}. Please check every number against the stock in front of you.` : "I couldn’t confidently match the note to every product. Enter your actual counts in the review below.", voiceLanguage);
-      setInput("");
+      const taskId = add("task", "Understanding the quantities that arrived", "running");
+      try {
+        const extracted = await extractReceiving(caseId, artifact.artifactId);
+        setReceivingResult(extracted);
+        if (extracted.status === "error") {
+          update(taskId, { state: "error" });
+          offerCountReview(note, voiceLanguage, true);
+          return;
+        }
+        update(taskId, { state: "done" });
+        const staged = applySuggestions(extracted.facts);
+        if (!staged) { offerCountReview(note, voiceLanguage, false); return; }
+        setShowCountReview(true);
+        addReply(voiceLanguage === "hi-IN" || /[\u0900-\u097f]/u.test(note)
+          ? `${staged} प्रोडक्ट की गिनती सुझाई है। सामने रखे स्टॉक से हर संख्या जाँचकर पुष्टि करें।`
+          : `I suggested counts for ${staged} ${staged === 1 ? "product" : "products"}. Please check every number against the stock in front of you.`, voiceLanguage);
+        setInput("");
+      } catch (cause) {
+        update(taskId, { state: "error" });
+        if (cause instanceof Error && /case not found/i.test(cause.message)) throw cause;
+        setReceivingResult({ status: "error", error: { code: "MODEL_FAILED", message: "AI extraction failed. Confirm counts manually.", recoverable: true } });
+        offerCountReview(note, voiceLanguage, true);
+      }
     } catch (cause) { fail(cause, "Receiving note processing failed."); }
     finally { setBusy(null); }
   }
