@@ -95,6 +95,10 @@ function hasFuturePromise(text: string): boolean {
   return /\b(?:will|shall|promise|promised|next\s+(?:invoice|bill)|future|later|agle\s+(?:bill|invoice)|adjust\s+kar\s+denge)\b/iu.test(text);
 }
 
+function canonicalLineEndings(text: string): string {
+  return text.replace(/\r\n?/g, "\n");
+}
+
 /** Validate model observations against the uploaded source before any balance can use them. */
 export function normalizeRecoveryEvidence(
   input: Pick<RecoveryEvidenceInput, "artifactId" | "label">,
@@ -121,7 +125,9 @@ export function normalizeRecoveryEvidence(
 
   if (!excerpt && !locator) confirmations.push("No excerpt or location was supplied for this evidence");
   if (sourceText !== undefined) {
-    if (!excerpt || !sourceText.includes(excerpt)) confirmations.push("The cited excerpt was not found in the uploaded text");
+    if (!excerpt || !canonicalLineEndings(sourceText).includes(canonicalLineEndings(excerpt))) {
+      confirmations.push("The cited excerpt was not found in the uploaded text");
+    }
     if (referenceText && !sourceText.includes(referenceText)) confirmations.push("The document reference was not found in the uploaded text");
     if (amountText && (!excerpt?.includes(amountText) || !sourceText.includes(amountText))) {
       confirmations.push("The printed credit amount was not found in the cited excerpt");

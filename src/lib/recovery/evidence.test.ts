@@ -44,6 +44,19 @@ describe("recovery evidence extraction", () => {
     });
   });
 
+  it("grounds a multi-line excerpt when the uploaded note uses CRLF", () => {
+    const text = "Issued Credit Note CN-3812-FULL\r\nPosted credit for the accepted claim.\r\nTotal credit issued and posted: ₹3,218.00";
+    const result = normalizeRecoveryEvidence(source, {
+      evidenceType: "credit_note",
+      amountText: "₹3,218.00",
+      referenceText: "CN-3812-FULL",
+      sourceExcerpt: "Posted credit for the accepted claim.\nTotal credit issued and posted: ₹3,218.00",
+      sourceLocator: null,
+      uncertainties: [],
+    }, text);
+    expect(result).toMatchObject({ status: "ready", evidence: { explicitAmountPaise: 321800 } });
+  });
+
   it("reads a partial credit printed on a later invoice", () => {
     const text = "Invoice INV-4001\nCredit adjustment ₹1,000\nAmount due ₹2,000";
     const result = normalizeRecoveryEvidence(source, {
