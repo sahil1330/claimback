@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {
   ArrowRight,
+  Bot,
   CircleCheck,
   Clock3,
   FileSearch,
@@ -97,17 +98,24 @@ export function DashboardOverview({
   return (
     <div className="space-y-8">
       <div>
-        <p className="text-xs font-bold uppercase tracking-[0.16em] text-primary">Overview</p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Your margin, in view.</h1>
+        <p className="text-xs font-bold uppercase tracking-[0.16em] text-primary">Your delivery desk</p>
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">What arrived today?</h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-muted sm:text-base">
-          Track supplier differences from detection through verified recovery.
+          Talk it through with ClaimBack, then check the invoice, supplier promise and actual stock together.
         </p>
       </div>
+
+      <section aria-label="Start a delivery conversation" className="rounded-[1.5rem] border border-primary/20 bg-surface p-5 shadow-sm sm:p-7">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 items-start gap-4"><span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-success-soft text-primary"><Bot className="size-6" aria-hidden="true" /></span><div><p className="text-xs font-bold uppercase tracking-[0.15em] text-primary">ClaimBack assistant</p><h2 className="mt-1 text-xl font-semibold tracking-tight sm:text-2xl">“Tell me what arrived.”</h2><p className="mt-2 max-w-xl text-sm leading-6 text-muted">Speak or type first. Add your invoice and supplier message as we go. ClaimBack suggests counts and explains every difference before you approve a claim.</p></div></div>
+          <Link href="/app/receive" className="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-lg bg-primary px-5 text-sm font-semibold text-white transition-colors hover:bg-primary/90"><Mic className="size-4" aria-hidden="true" />Talk to ClaimBack <ArrowRight className="size-4" aria-hidden="true" /></Link>
+        </div>
+      </section>
 
       <section aria-labelledby="margin-protected-heading" className="relative overflow-hidden rounded-[1.5rem] bg-[#123f2d] p-6 text-white shadow-sm sm:p-8 lg:p-10">
         <div aria-hidden="true" className="pointer-events-none absolute -right-28 -top-40 size-[28rem] rounded-full border border-white/10" />
         <div aria-hidden="true" className="pointer-events-none absolute -right-10 -top-24 size-[20rem] rounded-full border border-white/10" />
-        <div className="relative flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
+        <div className="relative">
           <div>
             <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-[#d6f4df]">
               <ShieldCheck className="size-4" aria-hidden="true" /> Verified recovery
@@ -119,16 +127,7 @@ export function DashboardOverview({
             <p className="mt-4 max-w-xl text-sm leading-6 text-[#d6e8db]">
               Counted only when recovery is recorded as verified. A supplier promise stays in pending recovery.
             </p>
-            <div className="mt-6 flex flex-wrap items-center gap-3">
-              <Link href="/app/receive" className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-white/30 bg-white/10 px-4 text-sm font-semibold text-white transition-colors hover:bg-white/20">
-                <Mic className="size-4" aria-hidden="true" /> Speak what arrived <ArrowRight className="size-4" aria-hidden="true" />
-              </Link>
-              <p className="max-w-xs text-xs leading-5 text-[#d6e8db]">Add the invoice and supplier promise first, then record or type a note. AI suggests counts for your review.</p>
-            </div>
           </div>
-          <Link href="/app/receive" className="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 self-start rounded-lg bg-white px-5 text-sm font-semibold text-[#123f2d] transition-colors hover:bg-[#e5f4ea] lg:self-auto">
-            Receive Stock <ArrowRight className="size-4" aria-hidden="true" />
-          </Link>
         </div>
       </section>
 

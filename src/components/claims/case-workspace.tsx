@@ -7,6 +7,7 @@ import { ArrowLeft, ArrowRight, CheckCircle2, LoaderCircle, Send } from "lucide-
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { formatPaise } from "@/components/dashboard/metrics";
+import { CaseChat } from "./case-chat";
 import { DiscrepancyResult } from "./discrepancy-result";
 import { RecoveryPanel } from "./recovery/recovery-panel";
 import type { CaseView } from "./load-case";
@@ -86,6 +87,7 @@ export function CaseWorkspace({ caseView }: { caseView: CaseView }) {
     <div className="space-y-7">
       <Link href="/app/cases" className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:underline"><ArrowLeft className="size-4" aria-hidden="true" />All cases</Link>
       <div className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[0.16em] text-primary">Case details</p><h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">{caseView.supplierName ?? caseView.title ?? "Supplier delivery"}</h1><p className="mt-2 text-sm text-muted">{caseView.title && caseView.supplierName ? `${caseView.title} · ` : ""}Case {caseView.id.slice(0, 8)}</p></div><span className="rounded-full bg-success-soft px-3 py-1.5 text-xs font-semibold text-primary">{stateLabels[caseView.status]}</span></div>
+      <CaseChat key={caseView.id} caseId={caseView.id} />
       <section aria-label="Case amounts" className="grid gap-3 sm:grid-cols-3">{[
         ["Potential recovery", caseView.potentialRecoveryPaise],
         ["Verified recovered", caseView.recoveredPaise],
