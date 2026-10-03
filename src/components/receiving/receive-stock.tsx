@@ -18,6 +18,7 @@ import {
   extractInvoice, extractReceiving, reconcileReceiving, uploadReceivingEvidence,
 } from "./api";
 import { initialReceivingDrafts, prepareCaseFacts, type ReceivingDraft } from "./prepare-facts";
+import { appendReceivingUpdate } from "./receiving-note";
 import { SourceConfirmation, type SourceConfirmationSubmission } from "./source-confirmation";
 import { VoiceReceivingNote } from "./voice-receiving-note";
 import { useVoiceReply } from "./use-voice-reply";
@@ -67,7 +68,7 @@ function evidenceFileError(file: File): string | null {
 }
 
 function looksLikeArrivalDetails(message: string): boolean {
-  return /\b(arriv\w*|receiv\w*|deliver\w*|short|missing|damag\w*|boxes|box|units|packs|pieces|count\w*)\b|आए|मंगाए|कम|डैमेज|बॉक्स|पीस|पैकेट/i.test(message);
+  return /\b(arriv\w*|receiv\w*|deliver\w*|short|missing|damag\w*|torn|boxes|box|units|packs|pieces|count\w*)\b|आए|आया|मिले|मंगाए|कम|डैमेज|बॉक्स|पीस|पैकेट|फट|खराब|टूट|नुकसान/i.test(message);
 }
 
 function SourceSummary({ facts, label }: { facts: InvoiceFacts | AgreementFacts; label: string }) {
@@ -363,6 +364,11 @@ export function ReceiveStock() {
     } catch (cause) { fail(cause, "Receiving note processing failed."); }
     finally { setBusy(null); }
   }
+  function submitReceivingNote(text: string, voiceLanguage: string | null) {
+    const note = phase === "counts" ? appendReceivingUpdate(receivingText, text) : text.trim();
+    if (note !== text.trim()) add("you", text.trim());
+    void processReceivingNote(note, voiceLanguage, note === text.trim());
+  }
   function updateDraft(index: number, changes: Partial<ReceivingDraft>) {
     setDrafts((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, ...changes } : item));
     setSuggestedFields((current) => { const next = new Set(current); for (const field of ["paid", "free", "damaged"]) if (field in changes) next.delete(`${index}:${field}`); return next; });
@@ -439,7 +445,9 @@ export function ReceiveStock() {
 
   async function askAgent(question: string, voiceLanguage: string | null) {
     if (voiceLanguage) { stop(); setVoiceReplyActivityId(null); }
-    if (phase === "promise" && looksLikeArrivalDetails(question)) setReceivingText(question);
+    if ((phase === "invoice" || phase === "promise") && looksLikeArrivalDetails(question)) {
+      setReceivingText((current) => appendReceivingUpdate(current, question));
+    }
     add("you", question);
     const id = add("assistant", "On it…", "running");
     activeChatActivityId.current = id;
@@ -463,7 +471,8 @@ export function ReceiveStock() {
     if (phase === "promise" && file) { void runAgreement(file, receivingText); return; }
     if (phase === "recovery" && file) { void checkRecovery(file); return; }
     if (text && (phase === "receiving" || phase === "counts") && looksLikeArrivalDetails(text)) {
-      void processReceivingNote(text, voiceDraftLanguage);
+      submitReceivingNote(text, voiceDraftLanguage);
+      setVoiceDraftLanguage(null);
       return;
     }
     if (text) { setInput(""); setVoiceDraftLanguage(null); void askAgent(text, voiceDraftLanguage); }
@@ -481,7 +490,7 @@ export function ReceiveStock() {
     } else if (phase === "promise") {
       void runAgreement(new File([text], "supplier-promise.txt", { type: "text/plain" }), receivingText, spokenLanguage, true);
     } else if (phase === "receiving" || phase === "counts") {
-      void processReceivingNote(text, spokenLanguage);
+      submitReceivingNote(text, spokenLanguage);
     }
   }
   const evidenceAction = phase === "invoice" ? "Use as arrival note" : phase === "promise" ? "Use as supplier promise" : phase === "receiving" || phase === "counts" ? "Use as receiving note" : null;
@@ -512,7 +521,7 @@ export function ReceiveStock() {
       </div>
       {error && <p role="alert" className="mx-4 mb-3 rounded-lg bg-danger-soft p-3 text-sm text-danger sm:mx-8">{error}</p>}
       {caseMissing && <div role="alert" className="mx-4 mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-danger/20 bg-danger-soft p-4 text-sm sm:mx-8"><p>This delivery was removed. The old conversation cannot continue.</p><Button type="button" onClick={() => window.location.reload()}>Start a new delivery</Button></div>}
-      <form onSubmit={submit} className="border-t border-border bg-[#fbfcfa] px-4 py-4 sm:px-6"><div className="mx-auto max-w-3xl"><div className="flex items-center justify-between gap-3"><p className="text-xs font-semibold text-primary">{phase === "invoice" ? "Start with the invoice" : phase === "promise" ? "Add the supplier promise" : phase === "receiving" || phase === "counts" ? "Tell me what arrived" : phase === "recovery" ? "Check later evidence" : "Continue the conversation"}</p><span className="text-right text-xs text-muted">{canAttach ? `Or ${dropLabel.toLowerCase()}` : "Ask or speak"}</span></div>{phase === "invoice" && file && <label className="mt-3 block text-xs font-semibold">Supplier name<input className={`${fieldClass} mt-1`} value={supplierName} maxLength={160} onChange={(event) => setSupplierName(event.target.value)} placeholder="e.g. North Star Pharma" /></label>}{phase === "recovery" && file && <label className="mt-3 block text-xs font-semibold">Document type<select className={`${fieldClass} mt-1`} value={recoveryType} onChange={(event) => setRecoveryType(event.target.value as "credit_note" | "corrected_invoice")}><option value="credit_note">Credit note</option><option value="corrected_invoice">Later or corrected invoice</option></select></label>}{file && <div className="mt-3 flex items-center justify-between gap-2 rounded-lg bg-success-soft px-3 py-2 text-xs"><span className="min-w-0 truncate font-semibold"><FileCheck2 className="mr-2 inline size-4" aria-hidden="true" />{file.name}</span><button type="button" className="flex size-8 shrink-0 items-center justify-center rounded-md hover:bg-primary/10" aria-label="Remove attachment" onClick={resetFile}><X className="size-4" aria-hidden="true" /></button></div>}<label htmlFor="delivery-message" className="sr-only">Message ClaimBack</label><textarea id="delivery-message" className="mt-3 min-h-20 w-full resize-y rounded-xl border border-border bg-surface px-4 py-3 text-base placeholder:text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20" value={input} onChange={(event) => setInput(event.target.value)} placeholder={composerHint} maxLength={4000} disabled={Boolean(busy) || caseMissing} /><div className="mt-2 flex flex-wrap items-center justify-between gap-2"><div className="flex items-center gap-2">{canAttach && <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-border bg-surface px-3 text-xs font-semibold hover:border-primary"><Paperclip className="size-4 text-primary" aria-hidden="true" />Attach {phase === "invoice" ? "invoice" : phase === "promise" ? "promise" : "evidence"}<input ref={fileInputRef} type="file" className="sr-only" accept={documentAccept} disabled={Boolean(busy) || caseMissing} onChange={(event) => selectEvidenceFile(event.target.files?.[0] ?? null)} /></label>}<VoiceReceivingNote disabled={Boolean(busy) || caseMissing} onConfirm={(transcript, languageCode) => { setInput((current) => current.trim() ? `${current.trim()} ${transcript}` : transcript); setVoiceDraftLanguage(voiceLanguageSchema.safeParse(languageCode).data ?? "en-IN"); }} />{evidenceAction && !caseMissing && input.trim() && !file && <button type="button" className="min-h-11 rounded-lg px-2 text-xs font-semibold text-primary hover:bg-success-soft" onClick={useAsEvidence}>{evidenceAction}</button>}</div><Button type="submit" disabled={submitDisabled}>{busy ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : file ? <FilePlus2 className="size-4" aria-hidden="true" /> : <ArrowRight className="size-4" aria-hidden="true" />}{file ? "Send file" : "Send"}</Button></div></div></form>
+      <form onSubmit={submit} className="border-t border-border bg-[#fbfcfa] px-4 py-4 sm:px-6"><div className="mx-auto max-w-3xl"><div className="flex items-center justify-between gap-3"><p className="text-xs font-semibold text-primary">{phase === "invoice" ? "Start with the invoice" : phase === "promise" ? (receivingText ? "Add the supplier promise; your arrival counts are next" : "Add the supplier promise") : phase === "receiving" || phase === "counts" ? "Tell me what arrived" : phase === "recovery" ? "Check later evidence" : "Continue the conversation"}</p><span className="text-right text-xs text-muted">{canAttach ? `Or ${dropLabel.toLowerCase()}` : "Ask or speak"}</span></div>{phase === "invoice" && file && <label className="mt-3 block text-xs font-semibold">Supplier name<input className={`${fieldClass} mt-1`} value={supplierName} maxLength={160} onChange={(event) => setSupplierName(event.target.value)} placeholder="e.g. North Star Pharma" /></label>}{phase === "recovery" && file && <label className="mt-3 block text-xs font-semibold">Document type<select className={`${fieldClass} mt-1`} value={recoveryType} onChange={(event) => setRecoveryType(event.target.value as "credit_note" | "corrected_invoice")}><option value="credit_note">Credit note</option><option value="corrected_invoice">Later or corrected invoice</option></select></label>}{file && <div className="mt-3 flex items-center justify-between gap-2 rounded-lg bg-success-soft px-3 py-2 text-xs"><span className="min-w-0 truncate font-semibold"><FileCheck2 className="mr-2 inline size-4" aria-hidden="true" />{file.name}</span><button type="button" className="flex size-8 shrink-0 items-center justify-center rounded-md hover:bg-primary/10" aria-label="Remove attachment" onClick={resetFile}><X className="size-4" aria-hidden="true" /></button></div>}<label htmlFor="delivery-message" className="sr-only">Message ClaimBack</label><textarea id="delivery-message" className="mt-3 min-h-20 w-full resize-y rounded-xl border border-border bg-surface px-4 py-3 text-base placeholder:text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20" value={input} onChange={(event) => setInput(event.target.value)} placeholder={composerHint} maxLength={4000} disabled={Boolean(busy) || caseMissing} /><div className="mt-2 flex flex-wrap items-center justify-between gap-2"><div className="flex items-center gap-2">{canAttach && <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-border bg-surface px-3 text-xs font-semibold hover:border-primary"><Paperclip className="size-4 text-primary" aria-hidden="true" />Attach {phase === "invoice" ? "invoice" : phase === "promise" ? "promise" : "evidence"}<input ref={fileInputRef} type="file" className="sr-only" accept={documentAccept} disabled={Boolean(busy) || caseMissing} onChange={(event) => selectEvidenceFile(event.target.files?.[0] ?? null)} /></label>}<VoiceReceivingNote disabled={Boolean(busy) || caseMissing} onConfirm={(transcript, languageCode) => { setInput((current) => current.trim() ? `${current.trim()} ${transcript}` : transcript); setVoiceDraftLanguage(voiceLanguageSchema.safeParse(languageCode).data ?? "en-IN"); }} />{evidenceAction && !caseMissing && input.trim() && !file && <button type="button" className="min-h-11 rounded-lg px-2 text-xs font-semibold text-primary hover:bg-success-soft" onClick={useAsEvidence}>{evidenceAction}</button>}</div><Button type="submit" disabled={submitDisabled}>{busy ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : file ? <FilePlus2 className="size-4" aria-hidden="true" /> : <ArrowRight className="size-4" aria-hidden="true" />}{file ? "Send file" : "Send"}</Button></div></div></form>
     </section>
   </div>;
 }
