@@ -6,6 +6,10 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "cf:build": "opennextjs-cloudflare build",
+    "cf:preview": "opennextjs-cloudflare preview",
+    "cf:deploy": "opennextjs-cloudflare deploy",
+    "deploy": "pnpm run cf:build && pnpm run cf:deploy",
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
@@ -21,6 +25,7 @@
   "dependencies": {
     "@ai-sdk/openai": "^4.0.83",
     "@ai-sdk/react": "^4.0.130",
+    "@opennextjs/cloudflare": "1.20.8",
     "@radix-ui/react-slot": "1.3.3",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.117.2",
@@ -47,6 +52,7 @@
     "supabase": "^2.120.0-beta.7",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "vitest": "^5.0.3"
+    "vitest": "^5.0.3",
+    "wrangler": "4.147.0"
   }
 }
