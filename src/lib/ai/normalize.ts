@@ -72,8 +72,8 @@ function addLineChecks(
   if (!source.excerpt && !source.locator) {
     confirmation(requests, `lines.${index}.source`, "No excerpt or locator was found", source);
   }
-  if (confidence === "low") {
-    confirmation(requests, `lines.${index}`, "Source text is unclear", source);
+  if (confidence !== "high") {
+    confirmation(requests, `lines.${index}`, confidence === "low" ? "Source text is unclear" : "Source confidence needs merchant review", source);
   }
 }
 
