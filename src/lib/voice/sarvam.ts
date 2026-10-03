@@ -129,8 +129,12 @@ export async function transcribeAudio(
   fetcher: typeof fetch = fetch,
 ): Promise<{ transcript: string; languageCode: string | null; source: "sarvam" }> {
   const audio = validateAudioFile(file);
+  // MediaRecorder adds codec parameters (for example audio/webm;codecs=opus).
+  // Sarvam accepts the bytes, but its multipart parser rejects that MIME label.
+  const mimeType = audio.type.toLowerCase().split(";", 1)[0];
+  const providerAudio = new File([audio], audio.name || "recording", { type: mimeType });
   const form = new FormData();
-  form.set("file", audio, audio.name || "recording");
+  form.set("file", providerAudio, providerAudio.name);
   form.set("model", "saaras:v4");
   form.set("mode", "transcribe");
   const raw = await callProvider("/speech-to-text", form, null, requestSignal, fetcher);

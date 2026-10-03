@@ -1,243 +1,240 @@
 "use client";
 
-import { useState } from "react";
-import { ArrowRight, Check, FileText, LoaderCircle, MessageSquareText, PackageCheck, UploadCloud } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import Link from "next/link";
+import { useChat } from "@ai-sdk/react";
+import { DefaultChatTransport } from "ai";
+import { ArrowRight, Bot, Check, CheckCircle2, ChevronDown, FileCheck2, FilePlus2, LoaderCircle, Paperclip, Send, ShieldCheck, Sparkles, X } from "lucide-react";
+import { z } from "zod";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { formatPaise } from "@/components/dashboard/metrics";
-import type { AgreementFacts, InvoiceFacts, ReceivingFacts } from "@/types/domain";
 import { DiscrepancyResult } from "@/components/claims/discrepancy-result";
+import { loadRecoveryHistory, uploadRecoveryEvidence, verifyRecoveryEvidence, type RecoveryHistory, type RecoveryResult } from "@/components/claims/recovery/api";
+import type { ClaimBackAgentUIMessage } from "@/lib/ai/agent";
 import { matchFactLines } from "@/lib/ai/match-facts";
+import type { AgreementFacts, InvoiceFacts, ReceivingFacts } from "@/types/domain";
 import {
-  confirmAgreementSource,
-  confirmInvoiceSource,
-  createReceivingCase,
-  extractAgreement,
-  extractInvoice,
-  extractReceiving,
-  reconcileReceiving,
-  uploadReceivingEvidence,
+  confirmAgreementSource, confirmInvoiceSource, createReceivingCase, extractAgreement,
+  extractInvoice, extractReceiving, reconcileReceiving, uploadReceivingEvidence,
 } from "./api";
 import { initialReceivingDrafts, prepareCaseFacts, type ReceivingDraft } from "./prepare-facts";
-import { AgentAssistant } from "./agent-assistant";
 import { SourceConfirmation, type SourceConfirmationSubmission } from "./source-confirmation";
+import { VoiceReceivingNote } from "./voice-receiving-note";
 
 type InvoiceResult = Awaited<ReturnType<typeof extractInvoice>>;
 type AgreementResult = Awaited<ReturnType<typeof extractAgreement>>;
 type ReceivingResult = Awaited<ReturnType<typeof extractReceiving>>;
 type ReconcileResult = Awaited<ReturnType<typeof reconcileReceiving>>;
-type Step = 0 | 1 | 2;
+type Activity = { id: number; kind: "you" | "assistant" | "task"; text: string; detail?: string; state?: "running" | "done" | "error" };
+type Phase = "invoice" | "invoice-confirm" | "promise" | "promise-confirm" | "receiving" | "counts" | "approval" | "supplier" | "recovery" | "resolved" | "clean";
 
-const steps = [
-  { name: "Invoice", icon: FileText, detail: "What the supplier billed" },
-  { name: "Supplier promise", icon: MessageSquareText, detail: "What was agreed" },
-  { name: "Stock received", icon: PackageCheck, detail: "Speak or type what arrived" },
-] as const;
+const documentAccept = ".pdf,.txt,.png,.jpg,.jpeg,.webp,application/pdf,text/plain,image/png,image/jpeg,image/webp";
+const fieldClass = "min-h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20";
+const scenariosSchema = z.object({ scenarios: z.array(z.object({ id: z.string(), name: z.string() })) });
+const responseSchema = z.object({
+  caseState: z.string(), acknowledgedPaise: z.number().int().safe(),
+  response: z.object({ rawBody: z.string(), needsConfirmation: z.boolean(), decisions: z.array(z.object({
+    discrepancyId: z.string(), outcome: z.string(), sourceExcerpt: z.string().nullable(),
+    supplierAcknowledgedPaise: z.number().int().safe().nullable(), promisedForText: z.string().nullable(), uncertainty: z.string().nullable(),
+  })) }).nullable(),
+});
+type DemoResponse = z.infer<typeof responseSchema>;
 
-const fieldClass = "min-h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm text-foreground file:mr-3 file:rounded-md file:border-0 file:bg-success-soft file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-primary focus:border-primary focus:outline-none";
-
-function ProcessButton({ busy, children, disabled, onClick }: { busy: boolean; children: React.ReactNode; disabled?: boolean; onClick: () => void }) {
-  return <Button type="button" onClick={onClick} disabled={busy || disabled}>{busy && <LoaderCircle className="animate-spin" aria-hidden="true" />}{children}</Button>;
+async function jsonResponse(response: Response): Promise<unknown> {
+  const body: unknown = await response.json().catch(() => null);
+  if (!response.ok) {
+    const parsed = z.object({ error: z.string() }).safeParse(body);
+    throw new Error(parsed.success ? parsed.data.error : `Request failed (${response.status})`);
+  }
+  return body;
 }
 
-function SourceStatus({ result, label }: { result: InvoiceResult | AgreementResult | null; label: string }) {
-  if (!result) return null;
-  if (result.status === "error") return <p role="alert" className="rounded-lg bg-danger-soft p-3 text-sm text-danger">{result.error.code === "MODEL_NOT_CONFIGURED" ? "AI extraction is unavailable until the model is configured." : result.error.message} Replace the source or retry when extraction is available.</p>;
-  if (result.status === "needs_confirmation") return null;
-  return <p className="inline-flex items-center gap-2 rounded-full bg-success-soft px-3 py-1.5 text-xs font-semibold text-primary"><Check className="size-4" aria-hidden="true" />{label} understood</p>;
+function inlineEmphasis(value: string) {
+  return value.split(/(\*\*[^*]+\*\*)/g).map((part, index) => part.startsWith("**") && part.endsWith("**")
+    ? <strong key={index} className="font-semibold">{part.slice(2, -2)}</strong>
+    : part);
 }
 
-function FactLines({ facts, kind }: { facts: InvoiceFacts | AgreementFacts; kind: "invoice" | "promise" }) {
-  return (
-    <ul className="divide-y divide-border rounded-xl border border-border">
-      {facts.lines.map((line, index) => (
-        <li key={`${line.rawName}-${index}`} className="p-3 text-sm">
-          <div className="flex flex-wrap items-center justify-between gap-2"><strong className="font-semibold">{line.rawName}</strong><span className="font-mono font-semibold tabular-nums">{line.unitPricePaise === null ? "Rate unclear" : formatPaise(BigInt(line.unitPricePaise))}</span></div>
-          <p className="mt-1 text-xs text-muted">{line.quantity ?? "?"} paid units{kind === "promise" && "scheme" in line && line.scheme ? ` · ${line.scheme.buyQuantity}+${line.scheme.freeQuantity} scheme` : ""} · {line.source.sourceLabel}</p>
-          {(line.source.excerpt || line.source.locator) && <p className="mt-2 truncate font-mono text-[11px] text-muted">{line.source.excerpt || line.source.locator}</p>}
-        </li>
-      ))}
-    </ul>
-  );
+function SourceSummary({ facts, label }: { facts: InvoiceFacts | AgreementFacts; label: string }) {
+  return <details className="mt-3 rounded-xl border border-border bg-surface text-sm"><summary className="flex min-h-11 cursor-pointer items-center justify-between gap-2 px-4 py-3 font-semibold marker:content-none">{label}: {facts.lines.length} {facts.lines.length === 1 ? "product" : "products"}<ChevronDown className="size-4 text-muted" aria-hidden="true" /></summary><ul className="divide-y divide-border border-t border-border">{facts.lines.map((line, index) => <li key={`${line.rawName}-${index}`} className="px-4 py-3"><div className="flex justify-between gap-3"><span className="font-medium">{line.rawName}</span><span className="font-mono tabular-nums">{line.unitPricePaise === null ? "Rate unclear" : formatPaise(BigInt(line.unitPricePaise))}</span></div><p className="mt-1 text-xs text-muted">{line.quantity ?? "?"} paid units · {line.source.sourceLabel}</p></li>)}</ul></details>;
 }
 
 export function ReceiveStock() {
-  const [step, setStep] = useState<Step>(0);
-  const [busy, setBusy] = useState<"invoice" | "agreement" | "confirmInvoice" | "confirmAgreement" | "receiving" | "reconcile" | null>(null);
+  const [activities, setActivities] = useState<Activity[]>([{ id: 0, kind: "assistant", text: "Send me an invoice. I’ll read it, compare the supplier promise and what arrived, then show you any money at risk." }]);
+  const nextActivityId = useRef(1);
+  const activeChatActivityId = useRef<number | null>(null);
+  const activeChatStartIndex = useRef(0);
+  const feedEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [supplierName, setSupplierName] = useState("");
   const [caseId, setCaseId] = useState<string | null>(null);
-  const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
-  const [agreementFile, setAgreementFile] = useState<File | null>(null);
-  const [agreementText, setAgreementText] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [input, setInput] = useState("");
+  const [askMode, setAskMode] = useState(false);
   const [receivingText, setReceivingText] = useState("");
   const [invoiceResult, setInvoiceResult] = useState<InvoiceResult | null>(null);
   const [agreementResult, setAgreementResult] = useState<AgreementResult | null>(null);
   const [receivingResult, setReceivingResult] = useState<ReceivingResult | null>(null);
-  const [suggestionMessage, setSuggestionMessage] = useState<string | null>(null);
+  const [showCountReview, setShowCountReview] = useState(false);
   const [drafts, setDrafts] = useState<ReceivingDraft[]>([]);
   const [suggestedFields, setSuggestedFields] = useState<Set<string>>(() => new Set());
   const [countsConfirmed, setCountsConfirmed] = useState(false);
   const [supplierConfirmed, setSupplierConfirmed] = useState(false);
   const [result, setResult] = useState<ReconcileResult | null>(null);
+  const [reviewedClaim, setReviewedClaim] = useState(false);
+  const [claimSent, setClaimSent] = useState(false);
+  const [scenarios, setScenarios] = useState<z.infer<typeof scenariosSchema>["scenarios"]>([]);
+  const [scenarioId, setScenarioId] = useState("");
+  const [supplierReply, setSupplierReply] = useState<DemoResponse | null>(null);
+  const [recoveryHistory, setRecoveryHistory] = useState<RecoveryHistory | null>(null);
+  const [recoveryResult, setRecoveryResult] = useState<RecoveryResult | null>(null);
+  const [recoveryArtifactId, setRecoveryArtifactId] = useState<string | null>(null);
+  const [recoveryType, setRecoveryType] = useState<"credit_note" | "corrected_invoice">("credit_note");
+  const [selectedObligations, setSelectedObligations] = useState<string[]>([]);
+  const [confirmedRecoveryLink, setConfirmedRecoveryLink] = useState(false);
+  const [resolved, setResolved] = useState(false);
 
   const invoice = invoiceResult?.status === "ready" ? invoiceResult.facts : null;
   const agreement = agreementResult?.status === "ready" ? agreementResult.facts : null;
-  const completed = result !== null && result.outcome !== "needs_confirmation";
   const namesDiffer = Boolean(invoice?.supplierName && agreement?.supplierName && invoice.supplierName.trim().toLocaleLowerCase("en-IN") !== agreement.supplierName.trim().toLocaleLowerCase("en-IN"));
+  const openObligations = recoveryHistory?.obligations.filter((item) => item.outstanding_paise > 0) ?? [];
+  const phase: Phase = resolved ? "resolved" : result?.outcome === "clean" ? "clean" : claimSent ? openObligations.length > 0 ? "recovery" : "supplier" : result?.outcome === "discrepancy" ? "approval" : agreementResult?.status === "needs_confirmation" ? "promise-confirm" : invoiceResult?.status === "needs_confirmation" ? "invoice-confirm" : !invoice ? "invoice" : !agreement ? "promise" : receivingResult ? "counts" : "receiving";
+  const transport = useMemo(() => new DefaultChatTransport<ClaimBackAgentUIMessage>({ api: "/api/agent", body: caseId ? { caseId } : {} }), [caseId]);
+  const { messages, status: chatStatus, sendMessage } = useChat<ClaimBackAgentUIMessage>({ transport });
 
-  function updateDraft(index: number, changes: Partial<ReceivingDraft>) {
-    setDrafts((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, ...changes } : item));
-    setSuggestedFields((current) => {
-      const next = new Set(current);
-      for (const field of ["paid", "free", "damaged"]) {
-        if (field in changes) next.delete(`${index}:${field}`);
-      }
-      return next;
-    });
-    setCountsConfirmed(false);
-    setResult(null);
+  useEffect(() => { feedEndRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }); }, [activities, phase]);
+  useEffect(() => {
+    const id = activeChatActivityId.current;
+    if (id === null) return;
+    const answer = [...messages.slice(activeChatStartIndex.current)].reverse().find((message) => message.role === "assistant");
+    const text = answer?.parts.filter((part) => part.type === "text").map((part) => part.text).join("\n") ?? "";
+    if (text) setActivities((current) => current.map((item) => item.id === id ? { ...item, text, state: chatStatus === "ready" ? "done" : "running" } : item));
+    if (chatStatus === "ready" && text) activeChatActivityId.current = null;
+  }, [messages, chatStatus]);
+  useEffect(() => {
+    if (!claimSent) return;
+    let active = true;
+    fetch("/api/demo/supplier-response").then(jsonResponse).then((body) => scenariosSchema.parse(body).scenarios).then((items) => {
+      if (active) { setScenarios(items); setScenarioId(items[0]?.id ?? ""); }
+    }).catch(() => { if (active) setScenarios([]); });
+    return () => { active = false; };
+  }, [claimSent]);
+
+  function add(kind: Activity["kind"], text: string, state?: Activity["state"], detail?: string) {
+    const id = nextActivityId.current++;
+    setActivities((current) => [...current, { id, kind, text, state, detail }]);
+    return id;
   }
-
-  function changeReceivingNote(note: string) {
-    setReceivingText(note);
-    if (suggestedFields.size) {
-      setDrafts((current) => current.map((draft, index) => ({
-        ...draft,
-        paid: suggestedFields.has(`${index}:paid`) ? "" : draft.paid,
-        free: suggestedFields.has(`${index}:free`) ? "" : draft.free,
-        damaged: suggestedFields.has(`${index}:damaged`) ? "" : draft.damaged,
-      })));
-      setSuggestedFields(new Set());
+  function update(id: number, changes: Partial<Activity>) {
+    setActivities((current) => current.map((item) => item.id === id ? { ...item, ...changes } : item));
+  }
+  async function track<T>(label: string, operation: () => Promise<T>): Promise<T> {
+    const id = add("task", label, "running");
+    try {
+      const value = await operation();
+      update(id, { state: "done" });
+      return value;
+    } catch (cause) {
+      update(id, { state: "error" });
+      throw cause;
     }
-    setReceivingResult(null);
-    setSuggestionMessage(null);
-    setCountsConfirmed(false);
-    setResult(null);
+  }
+  function fail(cause: unknown, fallback: string) {
+    const message = cause instanceof Error ? cause.message : fallback;
+    setError(message);
+    add("assistant", `I couldn’t finish that step: ${message} You can retry here.`);
+  }
+  function resetFile() {
+    setFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
-  async function runInvoice() {
-    if (!invoiceFile) { setError("Choose an invoice file first."); return; }
-    if (!supplierName.trim()) { setError("Enter the supplier name for this delivery."); return; }
-    setBusy("invoice"); setError(null); setResult(null);
+  async function runInvoice(invoiceFile: File) {
+    if (!supplierName.trim()) { setError("Add the supplier name beside the invoice before sending."); return; }
+    setBusy("invoice"); setError(null);
+    add("you", `Invoice: ${invoiceFile.name}`);
     try {
-      const id = caseId ?? await createReceivingCase(supplierName.trim());
+      const id = caseId ?? await track("Opening a delivery case", () => createReceivingCase(supplierName.trim()));
       if (!caseId) setCaseId(id);
-      const artifact = await uploadReceivingEvidence(id, "invoice", invoiceFile);
-      const extracted = await extractInvoice(id, artifact.artifactId);
+      const artifact = await track("Uploading invoice evidence", () => uploadReceivingEvidence(id, "invoice", invoiceFile));
+      const extracted = await track("Reading supplier, products and billed rates", () => extractInvoice(id, artifact.artifactId));
       setInvoiceResult(extracted);
-      setAgreementResult(null); setDrafts([]); setSuggestedFields(new Set()); setReceivingResult(null); setSuggestionMessage(null);
-      if (extracted.status === "ready") setStep(1);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not process the invoice. Retry with a clearer file.");
-    } finally { setBusy(null); }
+      resetFile();
+      if (extracted.status === "error") throw new Error(extracted.error.message);
+      if (extracted.status === "needs_confirmation") add("assistant", "I found details that need your check before I use this invoice. Review the source card below.");
+      else add("assistant", `Invoice understood. I found ${extracted.facts.lines.length} ${extracted.facts.lines.length === 1 ? "product" : "products"}. Add the supplier’s agreed rate, scheme or message next.`);
+    } catch (cause) { fail(cause, "Invoice processing failed."); }
+    finally { setBusy(null); }
   }
 
-  async function runAgreement() {
+  async function runAgreement(promiseFile: File, noteToProcess?: string) {
     if (!caseId || !invoice) return;
-    const file = agreementFile ?? (agreementText.trim() ? new File([agreementText.trim()], "supplier-promise.txt", { type: "text/plain" }) : null);
-    if (!file) { setError("Choose an agreement file or paste the supplier promise."); return; }
-    setBusy("agreement"); setError(null); setResult(null);
-    setReceivingResult(null); setSuggestionMessage(null); setCountsConfirmed(false);
+    setBusy("promise"); setError(null);
+    add("you", `Supplier promise: ${promiseFile.name}`);
     try {
-      const artifact = await uploadReceivingEvidence(caseId, "agreement", file);
-      const extracted = await extractAgreement(caseId, artifact.artifactId);
+      const artifact = await track("Saving the supplier promise", () => uploadReceivingEvidence(caseId, "agreement", promiseFile));
+      const extracted = await track("Checking agreed rates and free units", () => extractAgreement(caseId, artifact.artifactId));
       setAgreementResult(extracted);
-      if (extracted.status === "ready") {
+      resetFile(); setInput("");
+      if (extracted.status === "error") throw new Error(extracted.error.message);
+      if (extracted.status === "needs_confirmation") add("assistant", "A promise detail is uncertain. Please check it against the source before I compare the delivery.");
+      else {
         setDrafts(initialReceivingDrafts(invoice, extracted.facts));
-        setSuggestedFields(new Set());
-        setStep(2);
+        add("assistant", "Supplier promise understood. Tell me what actually arrived, or review the note you already sent.");
+        if (noteToProcess?.trim()) await processReceivingNote(noteToProcess.trim());
       }
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not process the supplier promise. Retry with clearer evidence.");
-    } finally { setBusy(null); }
+    } catch (cause) { fail(cause, "Promise processing failed."); }
+    finally { setBusy(null); }
   }
 
   async function confirmInvoice(submission: SourceConfirmationSubmission) {
     if (!caseId || invoiceResult?.status !== "needs_confirmation") return;
-    setBusy("confirmInvoice"); setError(null); setResult(null);
+    setBusy("confirming"); setError(null);
     try {
-      const confirmed = await confirmInvoiceSource(caseId, invoiceResult.facts.source.sourceArtifactId, submission);
+      const confirmed = await track("Saving your invoice corrections", () => confirmInvoiceSource(caseId, invoiceResult.facts.source.sourceArtifactId, submission));
       setInvoiceResult(confirmed);
-      if (confirmed.status === "ready") {
-        setAgreementResult(null); setDrafts([]); setSuggestedFields(new Set()); setReceivingResult(null); setSuggestionMessage(null);
-        setStep(1);
-      } else if (confirmed.status === "error") throw new Error(confirmed.error.message);
-    } finally { setBusy(null); }
+      if (confirmed.status === "error") throw new Error(confirmed.error.message);
+      if (confirmed.status === "ready") add("assistant", "Invoice facts confirmed. Add the supplier promise next.");
+    } catch (cause) { fail(cause, "Invoice confirmation failed."); }
+    finally { setBusy(null); }
   }
-
   async function confirmAgreement(submission: SourceConfirmationSubmission) {
     if (!caseId || !invoice || agreementResult?.status !== "needs_confirmation") return;
-    setBusy("confirmAgreement"); setError(null); setResult(null);
+    setBusy("confirming"); setError(null);
     try {
-      const confirmed = await confirmAgreementSource(caseId, agreementResult.facts.source.sourceArtifactId, submission);
+      const confirmed = await track("Saving your promise corrections", () => confirmAgreementSource(caseId, agreementResult.facts.source.sourceArtifactId, submission));
       setAgreementResult(confirmed);
+      if (confirmed.status === "error") throw new Error(confirmed.error.message);
       if (confirmed.status === "ready") {
         setDrafts(initialReceivingDrafts(invoice, confirmed.facts));
-        setSuggestedFields(new Set());
-        setReceivingResult(null); setSuggestionMessage(null); setCountsConfirmed(false);
-        setStep(2);
-      } else if (confirmed.status === "error") throw new Error(confirmed.error.message);
-    } finally { setBusy(null); }
-  }
-
-  async function understandReceiving(note: string): Promise<string> {
-    if (!caseId || !invoice || !agreement || !note.trim()) {
-      const message = "Finish the invoice and supplier promise, then describe what arrived.";
-      setError(message);
-      throw new Error(message);
-    }
-    changeReceivingNote(note.trim());
-    setStep(2);
-    setBusy("receiving"); setError(null);
-    try {
-      const file = new File([note.trim()], "merchant-receiving.txt", { type: "text/plain" });
-      const artifact = await uploadReceivingEvidence(caseId, "other", file);
-      const extracted = await extractReceiving(caseId, artifact.artifactId);
-      setReceivingResult(extracted);
-      if (extracted.status === "error") throw new Error(extracted.error.message);
-      const staged = applySuggestions(extracted.facts);
-      const summary = staged > 0
-        ? `Suggested counts for ${staged} ${staged === 1 ? "product" : "products"} are in Stock received. Review each value and confirm your own count.`
-        : "No product matched confidently. Review the parsed note and enter counts manually below.";
-      setSuggestionMessage(summary);
-      return summary;
-    } catch (cause) {
-      const message = cause instanceof Error ? cause.message : "Could not understand the note. Enter counts below instead.";
-      setError(message);
-      throw new Error(message);
-    } finally { setBusy(null); }
+        add("assistant", "Promise facts confirmed. I’m ready to check what arrived.");
+        if (receivingText.trim()) await processReceivingNote(receivingText.trim());
+      }
+    } catch (cause) { fail(cause, "Promise confirmation failed."); }
+    finally { setBusy(null); }
   }
 
   function applySuggestions(facts: ReceivingFacts): number {
     if (!invoice) return 0;
-    const invoiceCandidates = invoice.lines.map((line, index) => ({
-      id: String(index), rawName: line.rawName, skuCode: line.skuRef, unit: line.unit, packSize: line.packSize,
-    }));
+    const candidates = invoice.lines.map((line, index) => ({ id: String(index), rawName: line.rawName, skuCode: line.skuRef, unit: line.unit, packSize: line.packSize }));
     const proposed = new Map<number, ReceivingFacts["lines"][number][]>();
-    for (const { line, resolution } of matchFactLines(facts.lines, invoiceCandidates)) {
+    for (const { line, resolution } of matchFactLines(facts.lines, candidates)) {
       if (resolution.status !== "matched" || line.confidence !== "high") continue;
-      if (!("receivedQuantity" in line) ||
-        [line.receivedQuantity, line.receivedFreeQuantity, line.damagedQuantity].every((value) => value === null)) continue;
-      const uncertainFields = new Set(line.uncertainties.map((item) => item.field));
-      if ([...uncertainFields].some((field) => !["receivedQuantity", "receivedFreeQuantity", "damagedQuantity"].includes(field))) continue;
+      if (!("receivedQuantity" in line)) continue;
+      if ([line.receivedQuantity, line.receivedFreeQuantity, line.damagedQuantity].every((value) => value === null)) continue;
+      if (line.uncertainties.some((item) => !["receivedQuantity", "receivedFreeQuantity", "damagedQuantity"].includes(item.field))) continue;
       const index = Number(resolution.match.candidate.id);
-      const list = proposed.get(index) ?? [];
-      list.push(line);
-      proposed.set(index, list);
+      proposed.set(index, [...(proposed.get(index) ?? []), line]);
     }
     const staged = new Map<number, Partial<ReceivingDraft>>();
     const marked = new Set<string>();
     for (const [index, lines] of proposed) {
       if (lines.length !== 1) continue;
       const line = lines[0];
-      const fields = [
-        ["paid", "receivedQuantity"],
-        ["free", "receivedFreeQuantity"],
-        ["damaged", "damagedQuantity"],
-      ] as const;
       const values: Partial<ReceivingDraft> = {};
-      for (const [field, sourceField] of fields) {
+      for (const [field, sourceField] of [["paid", "receivedQuantity"], ["free", "receivedFreeQuantity"], ["damaged", "damagedQuantity"]] as const) {
         const value = line[sourceField];
         if (value === null || line.uncertainties.some((item) => item.field === sourceField)) continue;
         values[field] = String(value);
@@ -246,63 +243,152 @@ export function ReceiveStock() {
       if (Object.keys(values).length) staged.set(index, values);
     }
     setDrafts((current) => current.map((draft, index) => ({ ...draft, ...staged.get(index) })));
-    setSuggestedFields(marked);
-    setCountsConfirmed(false);
-    setResult(null);
+    setSuggestedFields(marked); setCountsConfirmed(false);
     return staged.size;
   }
 
+  async function processReceivingNote(note: string) {
+    if (!caseId || !invoice || !note.trim()) return;
+    setBusy("receiving"); setError(null);
+    setReceivingText(note.trim());
+    setDrafts((current) => current.map((draft, index) => ({ ...draft,
+      paid: suggestedFields.has(`${index}:paid`) ? "" : draft.paid,
+      free: suggestedFields.has(`${index}:free`) ? "" : draft.free,
+      damaged: suggestedFields.has(`${index}:damaged`) ? "" : draft.damaged,
+    })));
+    setSuggestedFields(new Set()); setCountsConfirmed(false); setResult(null); setReceivingResult(null);
+    add("you", note.trim());
+    try {
+      const source = new File([note.trim()], "merchant-receiving.txt", { type: "text/plain" });
+      const artifact = await track("Saving your receiving note", () => uploadReceivingEvidence(caseId, "other", source));
+      const extracted = await track("Understanding the quantities that arrived", () => extractReceiving(caseId, artifact.artifactId));
+      setReceivingResult(extracted);
+      if (extracted.status === "error") throw new Error(extracted.error.message);
+      const staged = applySuggestions(extracted.facts);
+      setShowCountReview(true);
+      add("assistant", staged ? `I suggested counts for ${staged} ${staged === 1 ? "product" : "products"}. Please check every number against the stock in front of you.` : "I couldn’t confidently match the note to every product. Enter your actual counts in the review below.");
+      setInput("");
+    } catch (cause) { fail(cause, "Receiving note processing failed."); }
+    finally { setBusy(null); }
+  }
+  function updateDraft(index: number, changes: Partial<ReceivingDraft>) {
+    setDrafts((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, ...changes } : item));
+    setSuggestedFields((current) => { const next = new Set(current); for (const field of ["paid", "free", "damaged"]) if (field in changes) next.delete(`${index}:${field}`); return next; });
+    setCountsConfirmed(false); setResult(null);
+  }
   async function runReconciliation() {
     if (!caseId || !invoice || !agreement) return;
     if (!countsConfirmed) { setError("Confirm that you counted the paid, free and damaged units."); return; }
     if (namesDiffer && !supplierConfirmed) { setError("Confirm that both documents refer to the same supplier."); return; }
-    setBusy("reconcile"); setError(null); setResult(null);
+    setBusy("reconcile"); setError(null);
     try {
       const input = prepareCaseFacts(caseId, invoice, agreement, drafts);
-      setResult(await reconcileReceiving(caseId, input));
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not reconcile this delivery. Check the facts and retry.");
-    } finally { setBusy(null); }
+      const next = await track("Comparing promised, billed and received facts", () => reconcileReceiving(caseId, input));
+      setResult(next);
+      if (next.outcome === "discrepancy") add("assistant", `I found ${next.discrepancies.length} source-grounded ${next.discrepancies.length === 1 ? "difference" : "differences"} worth ${formatPaise(BigInt(next.totalPotentialRecoveryPaise))}. I prepared the evidence for your review. I will wait for your approval before sending anything.`);
+      else add("assistant", "Some facts still need confirmation before I can calculate a claim.");
+    } catch (cause) { fail(cause, "Delivery check failed."); }
+    finally { setBusy(null); }
+  }
+  async function approveAndSend() {
+    if (!caseId || !reviewedClaim || result?.outcome !== "discrepancy") return;
+    setBusy("approval"); setError(null);
+    try {
+      await track("Recording your approval and sending the claim", async () => jsonResponse(await fetch(`/api/cases/${caseId}/approve`, { method: "POST" })));
+      setClaimSent(true);
+      add("assistant", "Your approval is recorded. I sent the claim through the demo supplier transport. The supplier’s reply is simulated here; any promised credit will stay open until we check later evidence.");
+    } catch (cause) { fail(cause, "Claim could not be sent."); }
+    finally { setBusy(null); }
+  }
+  async function triggerSupplier() {
+    if (!caseId || !scenarioId) return;
+    setBusy("supplier"); setError(null);
+    try {
+      const next = await track("Receiving and interpreting a simulated supplier reply", async () => responseSchema.parse(await jsonResponse(await fetch("/api/demo/supplier-response", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ caseId, scenarioId }) }))));
+      setSupplierReply(next);
+      if (next.response) add("assistant", `Supplier replied: “${next.response.rawBody}”`, "done", next.acknowledgedPaise > 0 ? `${formatPaise(BigInt(next.acknowledgedPaise))} acknowledged; credit still needs verification.` : "No recovery has been verified yet.");
+      else add("assistant", "No supplier reply yet. The claim remains open. You can check for another simulated update.");
+      const history = await track("Checking outstanding supplier commitments", () => loadRecoveryHistory(caseId));
+      setRecoveryHistory(history);
+    } catch (cause) { fail(cause, "Supplier response could not be checked."); }
+    finally { setBusy(null); }
+  }
+  async function checkRecovery(document?: File) {
+    if (!caseId) return;
+    const artifactId = recoveryArtifactId;
+    if (!document && !artifactId) return;
+    setBusy("recovery"); setError(null);
+    try {
+      let id = artifactId;
+      if (document) {
+        add("you", `${recoveryType === "credit_note" ? "Credit note" : "Later invoice"}: ${document.name}`);
+        const artifact = await track("Uploading later recovery evidence", () => uploadRecoveryEvidence(caseId, recoveryType, document));
+        id = artifact.artifactId;
+        setRecoveryArtifactId(id);
+        resetFile();
+      }
+      if (!id) return;
+      const next = await track("Checking the credit against the open commitment", () => verifyRecoveryEvidence({ caseId, artifactId: id, ...(selectedObligations.length ? { obligationIds: selectedObligations } : {}), ...(confirmedRecoveryLink ? { merchantConfirmedLink: true } : {}) }));
+      setRecoveryResult(next);
+      if (next.status === "error") throw new Error(next.error.message);
+      if (next.status === "needs_confirmation") add("assistant", "I need you to confirm which commitment this document belongs to before I count any credit.");
+      else {
+        const history = await loadRecoveryHistory(caseId);
+        setRecoveryHistory(history);
+        setRecoveryArtifactId(null); setConfirmedRecoveryLink(false); setSelectedObligations([]);
+        const verified = formatPaise(BigInt(next.verification.appliedPaise));
+        const outstanding = formatPaise(BigInt(next.verification.outstandingPaise));
+        add("assistant", next.verification.caseState === "RESOLVED" ? `${verified} verified from this evidence. The case is resolved.` : `${verified} verified from this evidence. ${outstanding} remains open; I’ll keep the commitment until later proof closes it.`);
+        if (next.verification.caseState === "RESOLVED") setResolved(true);
+      }
+    } catch (cause) { fail(cause, "Recovery evidence check failed."); }
+    finally { setBusy(null); }
   }
 
-  return (
-    <div className="space-y-7">
-      <div><p className="text-xs font-bold uppercase tracking-[0.16em] text-primary">Receive Stock</p><h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Tell ClaimBack what arrived.</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-muted">Start by speaking or typing. Add the invoice and supplier promise as evidence, then confirm the counts before ClaimBack checks the delivery.</p></div>
-      <AgentAssistant caseId={caseId} stage={completed ? "complete" : agreement ? "stock" : invoice ? "promise" : "invoice"} canFill={Boolean(invoice && agreement && !completed)} busy={Boolean(busy)} locked={completed} note={receivingText} onNoteChange={changeReceivingNote} onFill={understandReceiving} onStepChange={setStep} />
-      <div className="grid grid-cols-3 gap-2 lg:gap-4" aria-label="Receiving steps">
-        {steps.map(({ name, icon: Icon, detail }, index) => <button key={name} type="button" disabled={index > (invoice ? agreement ? 2 : 1 : 0)} onClick={() => setStep(index as Step)} className={`rounded-xl border p-3 text-left transition-colors lg:p-4 ${step === index ? "border-primary bg-success-soft" : "border-border bg-surface"} disabled:opacity-60`}><span className="flex items-center gap-2 text-xs font-semibold sm:text-sm"><Icon className="size-4 shrink-0" aria-hidden="true" /><span>{name}</span></span><span className="mt-1 hidden text-xs text-muted lg:block">{detail}</span></button>)}
+  async function askAgent(question: string) {
+    add("you", question);
+    const id = add("assistant", "Checking the case…", "running");
+    activeChatActivityId.current = id;
+    activeChatStartIndex.current = messages.length;
+    try { await sendMessage({ text: question }); }
+    catch { update(id, { text: "I couldn’t answer that right now. Your delivery is still saved; please retry.", state: "error" }); activeChatActivityId.current = null; }
+  }
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (busy || chatStatus === "streaming" || chatStatus === "submitted") return;
+    const text = input.trim();
+    if (askMode && text) { setInput(""); void askAgent(text); return; }
+    if (phase === "invoice") { if (file) { if (text) { setReceivingText(text); add("you", text); setInput(""); } void runInvoice(file); } else if (text) { setReceivingText(text); add("you", text); add("assistant", "I’ve kept your note. Attach the invoice so I can connect it to the delivery."); setInput(""); } return; }
+    if (phase === "promise") { const promise = file ?? (text ? new File([text], "supplier-promise.txt", { type: "text/plain" }) : null); if (promise) void runAgreement(promise, receivingText); return; }
+    if (phase === "receiving" || phase === "counts") { if (text) void processReceivingNote(text); return; }
+    if (phase === "recovery" && file) { void checkRecovery(file); return; }
+    if (text) { setInput(""); void askAgent(text); }
+  }
+  const composerHint = askMode ? "Ask about this case…" : phase === "invoice" ? "Describe what arrived, or attach an invoice…" : phase === "promise" ? "Paste the supplier’s message, or attach it…" : phase === "receiving" || phase === "counts" ? "Describe the received and damaged quantities…" : phase === "recovery" ? "Ask a question, or attach later credit evidence…" : "Ask ClaimBack about this case…";
+  const canAttach = !askMode && (phase === "invoice" || phase === "promise" || phase === "recovery");
+  const submitDisabled = Boolean(busy) || chatStatus === "streaming" || chatStatus === "submitted" || (!input.trim() && !file);
+
+  return <div className="mx-auto max-w-4xl space-y-5 pb-12">
+    <header className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-primary">Receive Stock</p><h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Let’s check this delivery.</h1><p className="mt-2 text-sm text-muted">One conversation from invoice to verified recovery.</p></div>{caseId && <Link href={`/app/cases/${caseId}`} className="text-xs font-semibold text-primary underline-offset-2 hover:underline">Open case record <ArrowRight className="inline size-3.5" aria-hidden="true" /></Link>}</header>
+    <section aria-label="ClaimBack delivery conversation" className="overflow-hidden rounded-[1.5rem] border border-border bg-surface shadow-sm">
+      <div className="flex items-center justify-between gap-3 border-b border-border bg-[#123f2d] px-4 py-4 text-white sm:px-6"><div className="flex items-center gap-3"><span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/15"><Bot className="size-5" aria-hidden="true" /></span><div><h2 className="text-sm font-semibold">ClaimBack</h2><p className="text-xs text-white/70">Your margin protection teammate</p></div></div><span className="rounded-full border border-white/20 px-3 py-1 text-xs font-medium text-white/85">{phase === "resolved" ? "Recovered" : phase === "clean" ? "Checked" : claimSent ? "Tracking recovery" : caseId ? "Working on delivery" : "Ready"}</span></div>
+      <div role="log" aria-label="Delivery progress and messages" aria-live="polite" aria-relevant="additions text" className="max-h-[45vh] min-h-44 space-y-4 overflow-y-auto px-4 py-6 sm:max-h-[min(55vh,600px)] sm:min-h-52 sm:px-8">
+        {activities.map((item) => item.kind === "task" ? <div key={item.id} className="ml-10 flex items-start gap-2 text-sm text-muted"><span className="mt-0.5 flex size-5 shrink-0 items-center justify-center">{item.state === "running" ? <LoaderCircle className="size-4 animate-spin text-primary" aria-hidden="true" /> : item.state === "error" ? <X className="size-4 text-danger" aria-hidden="true" /> : <Check className="size-4 text-primary" aria-hidden="true" />}</span><span>{item.text}</span></div> : <div key={item.id} className={`flex ${item.kind === "you" ? "justify-end" : "items-start gap-3"}`}>{item.kind === "assistant" && <span className="mt-1 flex size-8 shrink-0 items-center justify-center rounded-full bg-success-soft text-primary"><Sparkles className="size-4" aria-hidden="true" /></span>}<div className={`max-w-[min(90%,42rem)] rounded-2xl px-4 py-3 text-sm leading-6 ${item.kind === "you" ? "rounded-tr-sm bg-success-soft" : "rounded-tl-sm bg-surface-soft"}`}>{item.state === "running" && <LoaderCircle className="mr-2 inline size-4 animate-spin text-primary" aria-hidden="true" />}<p className="whitespace-pre-wrap">{item.kind === "assistant" ? inlineEmphasis(item.text) : item.text}</p>{item.detail && <p className="mt-2 text-xs text-muted">{item.detail}</p>}</div></div>)}
+        <div ref={feedEndRef} />
+        {invoiceResult?.status === "needs_confirmation" && caseId && <div className="ml-10"><SourceConfirmation key={invoiceResult.facts.source.sourceArtifactId} caseId={caseId} label="Invoice" facts={invoiceResult.facts} confirmations={invoiceResult.confirmations} busy={busy === "confirming"} onSubmit={confirmInvoice} /></div>}
+        {agreementResult?.status === "needs_confirmation" && caseId && <div className="ml-10"><SourceConfirmation key={agreementResult.facts.source.sourceArtifactId} caseId={caseId} label="Supplier promise" facts={agreementResult.facts} confirmations={agreementResult.confirmations} busy={busy === "confirming"} onSubmit={confirmAgreement} /></div>}
+        {invoice && result?.outcome !== "discrepancy" && <div className="ml-10"><SourceSummary facts={invoice} label="Invoice evidence" /></div>}
+        {agreement && result?.outcome !== "discrepancy" && <div className="ml-10"><SourceSummary facts={agreement} label="Supplier promise evidence" /></div>}
+        {invoice && agreement && (!result || result.outcome === "needs_confirmation") && !showCountReview && <div className="ml-10"><button type="button" className="min-h-11 rounded-lg border border-border px-4 text-xs font-semibold text-primary hover:border-primary" onClick={() => setShowCountReview(true)}>Enter counts manually</button></div>}
+        {invoice && agreement && (!result || result.outcome === "needs_confirmation") && showCountReview && <div className="ml-10 space-y-4 rounded-2xl border border-primary/20 bg-[#f7faf7] p-4 sm:p-5"><div className="flex items-start gap-3"><ShieldCheck className="mt-0.5 size-5 shrink-0 text-primary" aria-hidden="true" /><div><h3 className="font-semibold">Confirm what arrived</h3><p className="mt-1 text-xs leading-5 text-muted">I can suggest counts from your note. You verify each product before I calculate anything.</p></div></div>{receivingResult?.status === "ready" && <p className="rounded-lg bg-surface p-3 text-xs text-muted">Suggestions from your note are marked below. Correct any number that differs from your physical count.</p>}{invoice.lines.map((line, index) => { const draft = drafts[index]; if (!draft) return null; const promised = draft.promisedIndex === null ? null : agreement.lines[draft.promisedIndex]; return <div key={`${line.rawName}-${index}`} className="rounded-xl border border-border bg-surface p-4"><p className="text-sm font-semibold">{line.rawName}</p><label className="mt-3 block text-xs font-semibold">Matching promise<select className={`${fieldClass} mt-1`} value={draft.promisedIndex ?? ""} onChange={(event) => updateDraft(index, { promisedIndex: event.target.value === "" ? null : Number(event.target.value), matchConfirmed: false })}><option value="">Choose product</option>{agreement.lines.map((option, optionIndex) => <option key={optionIndex} value={optionIndex}>{option.rawName}</option>)}</select></label>{promised && <label className="mt-3 flex items-start gap-2 text-xs text-muted"><input type="checkbox" className="mt-0.5 accent-primary" checked={draft.matchConfirmed} onChange={(event) => updateDraft(index, { matchConfirmed: event.target.checked })} />I checked this product match against both sources</label>}<div className="mt-3 grid grid-cols-3 gap-2">{(["paid", "free", "damaged"] as const).map((field) => <label key={field} className="text-xs font-semibold capitalize">{field}{suggestedFields.has(`${index}:${field}`) && <span className="ml-1 text-primary">suggested</span>}<input className={`${fieldClass} mt-1 px-2 font-mono`} inputMode="numeric" pattern="[0-9]*" value={draft[field]} onChange={(event) => updateDraft(index, { [field]: event.target.value })} placeholder="0" /></label>)}</div></div>; })}{namesDiffer && <label className="flex items-start gap-2 rounded-lg bg-warning-soft p-3 text-xs text-warning"><input type="checkbox" className="mt-0.5 accent-primary" checked={supplierConfirmed} onChange={(event) => setSupplierConfirmed(event.target.checked)} />Invoice says “{invoice.supplierName}” and promise says “{agreement.supplierName}”. I confirmed they are the same supplier.</label>}<label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1 accent-primary" checked={countsConfirmed} onChange={(event) => setCountsConfirmed(event.target.checked)} />I counted and confirmed the paid, free and damaged units above.</label><Button type="button" disabled={Boolean(busy) || !countsConfirmed} onClick={() => void runReconciliation()}>{busy === "reconcile" && <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />}Check delivery <ArrowRight className="size-4" aria-hidden="true" /></Button></div>}
+        {caseId && result && <div className="ml-10"><DiscrepancyResult caseId={caseId} result={result} approvalPending={!claimSent} showCaseLink={false} showTimeline={false} compact receivingAnchor={null} /></div>}
+        {phase === "approval" && <div className="ml-10 rounded-2xl border border-primary/25 bg-success-soft p-4 sm:p-5"><p className="font-semibold">Your approval is needed</p><p className="mt-1 text-sm text-muted">The draft uses only the sourced differences above. Nothing goes to the supplier until you approve.</p><label className="mt-4 flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1 accent-primary" checked={reviewedClaim} onChange={(event) => setReviewedClaim(event.target.checked)} />I reviewed the discrepancy amounts and linked evidence.</label><Button type="button" className="mt-4" disabled={!reviewedClaim || Boolean(busy)} onClick={() => void approveAndSend()}>{busy === "approval" ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : <Send className="size-4" aria-hidden="true" />}Approve and send claim</Button></div>}
+        {claimSent && !resolved && <div className="ml-10 rounded-2xl border border-border bg-surface p-4 sm:p-5"><div className="flex items-start gap-2"><Bot className="mt-0.5 size-5 text-primary" aria-hidden="true" /><div><h3 className="font-semibold">Demo supplier response</h3><p className="mt-1 text-xs text-muted">Choose a stateful simulated reply. No real supplier is contacted.</p></div></div><div className="mt-4 flex flex-col gap-2 sm:flex-row"><label className="sr-only" htmlFor="supplier-scenario">Supplier response scenario</label><select id="supplier-scenario" className={`${fieldClass} flex-1`} value={scenarioId} onChange={(event) => setScenarioId(event.target.value)} disabled={Boolean(busy)}>{scenarios.length === 0 && <option value="">Loading scenarios…</option>}{scenarios.map((scenario) => <option key={scenario.id} value={scenario.id}>{scenario.name}</option>)}</select><Button type="button" variant="outline" disabled={!scenarioId || Boolean(busy)} onClick={() => void triggerSupplier()}>{busy === "supplier" && <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />}{supplierReply ? "Check next reply" : "Receive demo reply"}</Button></div>{supplierReply?.response && <p className="mt-3 text-xs text-warning">Supplier acceptance is a commitment. Only later evidence can close recovery.</p>}</div>}
+        {claimSent && openObligations.length > 0 && !resolved && <div className="ml-10 rounded-2xl border border-warning/20 bg-warning-soft/40 p-4 sm:p-5"><h3 className="font-semibold">Recovery still to verify</h3><p className="mt-1 text-sm text-muted">A promised credit stays open until a later document proves it.</p><ul className="mt-3 space-y-2">{openObligations.map((item) => <li key={item.id} className="rounded-lg border border-border bg-surface p-3 text-sm"><label className="flex items-start gap-2"><input type="checkbox" className="mt-1 accent-primary" checked={selectedObligations.includes(item.id)} onChange={(event) => setSelectedObligations((current) => event.target.checked ? [...current, item.id] : current.filter((id) => id !== item.id))} /><span><strong>{formatPaise(BigInt(item.outstanding_paise))} outstanding</strong><span className="mt-1 block text-xs text-muted">{item.promise_text || "Supplier commitment"}</span></span></label></li>)}</ul><p className="mt-3 text-xs text-muted">Attach a credit note or later invoice in the composer. Select the matching commitment if more than one is open.</p><label className="mt-3 flex items-start gap-2 text-xs"><input type="checkbox" className="mt-0.5 accent-primary" checked={confirmedRecoveryLink} onChange={(event) => setConfirmedRecoveryLink(event.target.checked)} />I confirm this later document belongs to this purchase if it lacks the original invoice reference.</label>{recoveryResult?.status === "needs_confirmation" && <div className="mt-3 rounded-lg bg-surface p-3 text-xs text-warning"><p className="font-semibold">Please confirm before counting credit</p><ul className="mt-1 list-disc pl-4">{recoveryResult.confirmations.map((item) => <li key={item}>{item}</li>)}</ul><Button type="button" size="sm" className="mt-3" disabled={Boolean(busy) || !recoveryArtifactId} onClick={() => void checkRecovery()}>Retry with confirmation</Button></div>}{recoveryResult?.status === "verified" && <p className="mt-3 rounded-lg bg-surface p-3 text-sm">Verified now: <strong>{formatPaise(BigInt(recoveryResult.verification.appliedPaise))}</strong> · still owed: <strong>{formatPaise(BigInt(recoveryResult.verification.outstandingPaise))}</strong></p>}</div>}
+        {resolved && <div className="ml-10 flex items-start gap-3 rounded-2xl border border-success/20 bg-success-soft p-5"><CheckCircle2 className="mt-0.5 size-5 text-success" aria-hidden="true" /><div><p className="font-semibold">Case closed after verified recovery</p><p className="mt-1 text-sm text-muted">The evidence and supplier commitment remain in the case record.</p></div></div>}
       </div>
-      {error && <div role="alert" className="rounded-xl border border-danger/20 bg-danger-soft p-4 text-sm text-danger">{error}</div>}
-      {busy && <p role="status" aria-live="polite" className="inline-flex items-center gap-2 text-sm font-medium text-primary"><LoaderCircle className="size-4 animate-spin" aria-hidden="true" />{busy === "invoice" ? "Uploading and understanding invoice…" : busy === "agreement" ? "Understanding supplier promise…" : busy === "confirmInvoice" || busy === "confirmAgreement" ? "Saving confirmed source facts…" : busy === "receiving" ? "Understanding your receiving note…" : "Checking the three truths…"}</p>}
-      <div className="grid items-start gap-5 lg:grid-cols-3">
-        <section aria-labelledby="invoice-heading" className={`${step === 0 ? "block" : "hidden"} rounded-2xl border border-border bg-surface p-5 shadow-sm lg:block lg:p-6`}>
-          <span className="flex size-10 items-center justify-center rounded-xl bg-success-soft text-primary"><FileText className="size-5" aria-hidden="true" /></span><h2 id="invoice-heading" className="mt-4 text-lg font-semibold">1. Invoice</h2><p className="mt-1 text-sm leading-6 text-muted">Upload the invoice PDF, photo or plain text.</p>
-          <label className="mt-5 block text-xs font-semibold">Supplier name<Input className="mt-2" value={supplierName} maxLength={160} disabled={Boolean(caseId)} onChange={(event) => setSupplierName(event.target.value)} placeholder="e.g. North Star Pharma" /></label>
-          <label className="mt-4 block text-xs font-semibold">Invoice file<input className={`${fieldClass} mt-2 py-2`} type="file" accept=".pdf,image/jpeg,image/png,image/webp,text/plain" onChange={(event) => setInvoiceFile(event.target.files?.[0] ?? null)} /></label>
-          <label className="mt-2 block text-xs font-semibold text-primary">Or take an invoice photo<input className={`${fieldClass} mt-1 py-2`} type="file" accept="image/*" capture="environment" onChange={(event) => setInvoiceFile(event.target.files?.[0] ?? null)} /></label>
-          <div className="mt-4"><ProcessButton busy={busy === "invoice"} disabled={Boolean(busy) || completed} onClick={runInvoice}><UploadCloud aria-hidden="true" />{caseId ? "Replace & understand invoice" : "Start review"}</ProcessButton></div>
-          <div className="mt-5 space-y-4"><SourceStatus result={invoiceResult} label="Invoice" />{invoiceResult?.status === "needs_confirmation" && caseId && <SourceConfirmation key={invoiceResult.facts.source.sourceArtifactId} caseId={caseId} label="Invoice" facts={invoiceResult.facts} confirmations={invoiceResult.confirmations} busy={busy === "confirmInvoice"} onSubmit={confirmInvoice} />}{invoiceResult && invoiceResult.status !== "error" && <FactLines facts={invoiceResult.facts} kind="invoice" />}</div>
-        </section>
-        <section aria-labelledby="agreement-heading" className={`${step === 1 ? "block" : "hidden"} rounded-2xl border border-border bg-surface p-5 shadow-sm lg:block lg:p-6`}>
-          <span className="flex size-10 items-center justify-center rounded-xl bg-success-soft text-primary"><MessageSquareText className="size-5" aria-hidden="true" /></span><h2 id="agreement-heading" className="mt-4 text-lg font-semibold">2. Supplier promise</h2><p className="mt-1 text-sm leading-6 text-muted">Use the agreed message, rate or scheme as evidence.</p>
-          <label className="mt-5 block text-xs font-semibold">Agreement file<input className={`${fieldClass} mt-2 py-2`} type="file" accept=".pdf,image/jpeg,image/png,image/webp,text/plain" disabled={!invoice} onChange={(event) => setAgreementFile(event.target.files?.[0] ?? null)} /></label>
-          <label className="mt-2 block text-xs font-semibold text-primary">Or take a promise photo<input className={`${fieldClass} mt-1 py-2`} type="file" accept="image/*" capture="environment" disabled={!invoice} onChange={(event) => setAgreementFile(event.target.files?.[0] ?? null)} /></label>
-          <p className="my-3 text-center text-xs font-semibold uppercase tracking-wider text-muted">or paste the message</p>
-          <label className="block text-xs font-semibold">Supplier message<textarea className={`${fieldClass} mt-2 min-h-28 py-3`} value={agreementText} disabled={!invoice || Boolean(agreementFile)} onChange={(event) => setAgreementText(event.target.value)} placeholder="50 boxes at ₹428, 10+1 free units..." /></label>
-          <div className="mt-4"><ProcessButton busy={busy === "agreement"} disabled={!invoice || Boolean(busy) || completed} onClick={runAgreement}><UploadCloud aria-hidden="true" />Understand promise</ProcessButton></div>
-          <div className="mt-5 space-y-4"><SourceStatus result={agreementResult} label="Supplier promise" />{agreementResult?.status === "needs_confirmation" && caseId && <SourceConfirmation key={agreementResult.facts.source.sourceArtifactId} caseId={caseId} label="Supplier promise" facts={agreementResult.facts} confirmations={agreementResult.confirmations} busy={busy === "confirmAgreement"} onSubmit={confirmAgreement} />}{agreementResult && agreementResult.status !== "error" && <FactLines facts={agreementResult.facts} kind="promise" />}</div>
-        </section>
-        <section aria-labelledby="receiving-heading" className={`${step === 2 ? "block" : "hidden"} rounded-2xl border border-border bg-surface p-5 shadow-sm lg:block lg:p-6`}>
-          <span className="flex size-10 items-center justify-center rounded-xl bg-success-soft text-primary"><PackageCheck className="size-5" aria-hidden="true" /></span><h2 id="receiving-heading" className="mt-4 text-lg font-semibold">3. Confirm stock received</h2><p className="mt-1 text-sm leading-6 text-muted">Review ClaimBack’s suggestions against your actual count. You can correct each number here.</p>
-          {receivingText && <p className="mt-4 rounded-lg bg-surface-soft p-3 text-xs leading-5 text-muted">Your note: {receivingText}</p>}
-          {receivingResult && <div className="mt-4 rounded-lg bg-surface-soft p-3 text-sm">{receivingResult.status === "error" ? <p role="alert">{receivingResult.error.message} Enter counts manually.</p> : <><p className="font-semibold">Understood from your note</p><ul className="mt-2 space-y-1 text-xs text-muted">{receivingResult.facts.lines.map((line, index) => <li key={index}>{line.rawName}: {line.receivedQuantity ?? "?"} paid, {line.receivedFreeQuantity ?? "?"} free, {line.damagedQuantity ?? "?"} damaged</li>)}</ul>{receivingResult.facts.lines.flatMap((line) => line.uncertainties.map((item) => ({ product: line.rawName, ...item }))).map((item, index) => <p key={index} className="mt-2 text-xs text-warning">Please check {item.product} {item.field === "damagedQuantity" ? "damaged count" : item.field === "receivedFreeQuantity" ? "free count" : item.field === "receivedQuantity" ? "paid count" : "details"}: {item.reason}</p>)}{suggestionMessage && <p className="mt-2 text-xs text-primary">{suggestionMessage}</p>}</>}</div>}
-          {invoice && agreement && <div className="mt-5 space-y-4">{invoice.lines.map((line, index) => { const draft = drafts[index]; if (!draft) return null; const promised = draft.promisedIndex === null ? null : agreement.lines[draft.promisedIndex]; return <div key={`${line.rawName}-${index}`} className="rounded-xl border border-border p-3"><p className="text-sm font-semibold">{line.rawName}</p><label className="mt-3 block text-xs font-semibold">Matches supplier promise<select className={`${fieldClass} mt-1`} value={draft.promisedIndex ?? ""} onChange={(event) => updateDraft(index, { promisedIndex: event.target.value === "" ? null : Number(event.target.value), matchConfirmed: false })}><option value="">Choose a product</option>{agreement.lines.map((option, optionIndex) => <option key={optionIndex} value={optionIndex}>{option.rawName}</option>)}</select></label>{promised && <label className="mt-3 flex items-start gap-2 text-xs text-muted"><input type="checkbox" className="mt-0.5 accent-primary" checked={draft.matchConfirmed} onChange={(event) => updateDraft(index, { matchConfirmed: event.target.checked })} />I confirmed this product match against both documents</label>}<div className="mt-4 grid grid-cols-3 gap-2">{(["paid", "free", "damaged"] as const).map((field) => <label key={field} className="text-xs font-semibold capitalize">{field}<input className={`${fieldClass} mt-1 px-2 font-mono`} inputMode="numeric" pattern="[0-9]*" value={draft[field]} onChange={(event) => updateDraft(index, { [field]: event.target.value })} placeholder={field === "free" && !promised?.scheme ? "—" : "0"} /></label>)}</div></div>; })}</div>}
-          {namesDiffer && <label className="mt-4 flex items-start gap-2 rounded-lg bg-warning-soft p-3 text-xs text-warning"><input type="checkbox" className="mt-0.5 accent-primary" checked={supplierConfirmed} onChange={(event) => setSupplierConfirmed(event.target.checked)} />Invoice says “{invoice?.supplierName}” and promise says “{agreement?.supplierName}”. I confirmed these are the same supplier.</label>}
-          {invoice && agreement && <label className="mt-4 flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1 accent-primary" checked={countsConfirmed} onChange={(event) => setCountsConfirmed(event.target.checked)} />I counted and confirmed the paid, free and damaged units above.</label>}
-          <div className="mt-5"><ProcessButton busy={busy === "reconcile"} disabled={!invoice || !agreement || Boolean(busy) || completed} onClick={runReconciliation}>Check delivery <ArrowRight aria-hidden="true" /></ProcessButton></div>
-        </section>
-      </div>
-      {caseId && result && <DiscrepancyResult caseId={caseId} result={result} />}
-    </div>
-  );
+      {error && <p role="alert" className="mx-4 mb-3 rounded-lg bg-danger-soft p-3 text-sm text-danger sm:mx-8">{error}</p>}
+      <form onSubmit={submit} className="border-t border-border bg-[#fbfcfa] px-4 py-4 sm:px-6"><div className="mx-auto max-w-3xl"><div className="flex items-center justify-between gap-3"><p className="text-xs font-semibold text-primary">{phase === "invoice" ? "Start with the invoice" : phase === "promise" ? "Add the supplier promise" : phase === "receiving" || phase === "counts" ? "Tell me what arrived" : phase === "recovery" ? "Check later evidence" : "Continue the conversation"}</p><button type="button" className="text-xs font-semibold text-muted underline-offset-2 hover:text-primary hover:underline" onClick={() => setAskMode((current) => !current)}>{askMode ? "Work on delivery" : "Ask a question"}</button></div>{phase === "invoice" && file && <label className="mt-3 block text-xs font-semibold">Supplier name<input className={`${fieldClass} mt-1`} value={supplierName} maxLength={160} onChange={(event) => setSupplierName(event.target.value)} placeholder="e.g. North Star Pharma" /></label>}{phase === "recovery" && file && <label className="mt-3 block text-xs font-semibold">Document type<select className={`${fieldClass} mt-1`} value={recoveryType} onChange={(event) => setRecoveryType(event.target.value as "credit_note" | "corrected_invoice")}><option value="credit_note">Credit note</option><option value="corrected_invoice">Later or corrected invoice</option></select></label>}{file && <div className="mt-3 flex items-center justify-between gap-2 rounded-lg bg-success-soft px-3 py-2 text-xs"><span className="min-w-0 truncate font-semibold"><FileCheck2 className="mr-2 inline size-4" aria-hidden="true" />{file.name}</span><button type="button" className="flex size-8 shrink-0 items-center justify-center rounded-md hover:bg-primary/10" aria-label="Remove attachment" onClick={resetFile}><X className="size-4" aria-hidden="true" /></button></div>}<label htmlFor="delivery-message" className="sr-only">Message ClaimBack</label><textarea id="delivery-message" className="mt-3 min-h-20 w-full resize-y rounded-xl border border-border bg-surface px-4 py-3 text-base placeholder:text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20" value={input} onChange={(event) => setInput(event.target.value)} placeholder={composerHint} maxLength={4000} disabled={Boolean(busy)} /><div className="mt-2 flex flex-wrap items-center justify-between gap-2"><div className="flex items-center gap-2">{canAttach && <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-border bg-surface px-3 text-xs font-semibold hover:border-primary"><Paperclip className="size-4 text-primary" aria-hidden="true" />Attach {phase === "invoice" ? "invoice" : phase === "promise" ? "promise" : "evidence"}<input ref={fileInputRef} type="file" className="sr-only" accept={documentAccept} disabled={Boolean(busy)} onChange={(event) => setFile(event.target.files?.[0] ?? null)} /></label>}<VoiceReceivingNote disabled={Boolean(busy)} onConfirm={(transcript) => setInput((current) => current.trim() ? `${current.trim()} ${transcript}` : transcript)} /></div><Button type="submit" disabled={submitDisabled}>{busy ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : file ? <FilePlus2 className="size-4" aria-hidden="true" /> : <ArrowRight className="size-4" aria-hidden="true" />}{file ? "Send file" : askMode ? "Ask" : phase === "invoice" ? "Keep note" : phase === "promise" ? "Use promise" : phase === "receiving" || phase === "counts" ? "Use note" : "Send"}</Button></div></div></form>
+    </section>
+  </div>;
 }

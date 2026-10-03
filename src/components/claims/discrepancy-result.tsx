@@ -26,8 +26,9 @@ function Evidence({ caseId, source, label, value, receivingAnchor }: { caseId: s
   );
 }
 
-function DiscrepancyCard({ caseId, item, receivingAnchor }: { caseId: string; item: Discrepancy; receivingAnchor: string | null }) {
+function DiscrepancyCard({ caseId, item, receivingAnchor, compact = false }: { caseId: string; item: Discrepancy; receivingAnchor: string | null; compact?: boolean }) {
   const display = presentDiscrepancy(item);
+  if (compact) return <details className="rounded-xl border border-border bg-surface"><summary className="flex min-h-14 cursor-pointer items-center justify-between gap-3 px-4 py-3 marker:content-none"><span className="min-w-0"><strong className="block text-sm">{display.title}</strong><span className="block truncate text-xs text-muted">{item.skuRef} · {item.description}</span></span><span className="shrink-0 font-mono text-sm font-semibold tabular-nums">{formatPaise(BigInt(item.amountPaise))}</span></summary><div className="border-t border-border p-4"><div className="grid gap-3 md:grid-cols-3"><Evidence caseId={caseId} source={item.promisedEvidence} label="Promised" value={display.promised} receivingAnchor={receivingAnchor} /><Evidence caseId={caseId} source={item.billedEvidence} label="Billed" value={display.billed} receivingAnchor={receivingAnchor} /><Evidence caseId={caseId} source={item.receivedEvidence} label="Received" value={display.received} receivingAnchor={receivingAnchor} /></div><p className="mt-3 rounded-lg bg-surface-soft p-3 font-mono text-xs leading-5">{display.formula}</p></div></details>;
   return (
     <article className="rounded-2xl border border-border bg-surface p-5 shadow-sm sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -65,15 +66,15 @@ function ActionTimeline({ caseId, outcome, approvalPending = false }: { caseId: 
   );
 }
 
-export function DiscrepancyResult({ caseId, result, approvalPending = true, showCaseLink = true, receivingAnchor = "#receiving-heading" }: { caseId: string; result: Result; approvalPending?: boolean; showCaseLink?: boolean; receivingAnchor?: string | null }) {
+export function DiscrepancyResult({ caseId, result, approvalPending = true, showCaseLink = true, showTimeline = true, compact = false, receivingAnchor = "#receiving-heading" }: { caseId: string; result: Result; approvalPending?: boolean; showCaseLink?: boolean; showTimeline?: boolean; compact?: boolean; receivingAnchor?: string | null }) {
   if (result.outcome === "needs_confirmation") return <section role="status" className="rounded-2xl border border-warning/20 bg-warning-soft p-5"><h2 className="font-semibold">More confirmation needed</h2><p className="mt-2 text-sm">{result.message}</p><ul className="mt-3 list-disc space-y-1 pl-5 text-sm">{result.confirmations.map((item, index) => <li key={index}>{item.reason}</li>)}</ul></section>;
-  if (result.outcome === "clean") return <div className="space-y-5"><section role="status" className="rounded-2xl border border-primary/20 bg-success-soft p-6"><ShieldCheck className="size-8 text-primary" aria-hidden="true" /><h2 className="mt-3 text-xl font-semibold">Delivery looks correct. No claim required.</h2><p className="mt-2 text-sm text-muted">The confirmed promise, invoice and receiving counts agree.</p></section><ActionTimeline caseId={caseId} outcome="clean" /></div>;
+  if (result.outcome === "clean") return <div className="space-y-5"><section role="status" className="rounded-2xl border border-primary/20 bg-success-soft p-6"><ShieldCheck className="size-8 text-primary" aria-hidden="true" /><h2 className="mt-3 text-xl font-semibold">Delivery looks correct. No claim required.</h2><p className="mt-2 text-sm text-muted">The confirmed promise, invoice and receiving counts agree.</p></section>{showTimeline && <ActionTimeline caseId={caseId} outcome="clean" />}</div>;
   return (
     <div className="space-y-5">
-      <section role="status" className="rounded-2xl border border-warning/20 bg-warning-soft p-6"><div className="flex items-start gap-3"><FileSearch className="mt-0.5 size-6 shrink-0 text-warning" aria-hidden="true" /><div><h2 className="text-xl font-semibold">{result.discrepancies.length} source-grounded {result.discrepancies.length === 1 ? "difference" : "differences"} found</h2><p className="mt-1 text-sm text-muted">Potential recovery: <strong className="font-mono text-foreground">{formatPaise(BigInt(result.totalPotentialRecoveryPaise))}</strong>. {approvalPending ? "Check the evidence below before approving any claim." : "The original evidence remains available while recovery is tracked."}</p></div></div></section>
+      {!compact && <section role="status" className="rounded-2xl border border-warning/20 bg-warning-soft p-6"><div className="flex items-start gap-3"><FileSearch className="mt-0.5 size-6 shrink-0 text-warning" aria-hidden="true" /><div><h2 className="text-xl font-semibold">{result.discrepancies.length} source-grounded {result.discrepancies.length === 1 ? "difference" : "differences"} found</h2><p className="mt-1 text-sm text-muted">Potential recovery: <strong className="font-mono text-foreground">{formatPaise(BigInt(result.totalPotentialRecoveryPaise))}</strong>. {approvalPending ? "Check the evidence below before approving any claim." : "The original evidence remains available while recovery is tracked."}</p></div></div></section>}
       {approvalPending && showCaseLink && <Link href={`/app/cases/${caseId}`} className="inline-flex min-h-11 items-center rounded-lg bg-primary px-4 text-sm font-semibold text-white hover:opacity-90">Review case and approve</Link>}
-      <section aria-label="Discrepancies" className="space-y-4">{result.discrepancies.map((item) => <DiscrepancyCard key={item.id} caseId={caseId} item={item} receivingAnchor={receivingAnchor} />)}</section>
-      <ActionTimeline caseId={caseId} outcome="discrepancy" approvalPending={approvalPending} />
+      <section aria-label="Discrepancies" className={compact ? "space-y-2" : "space-y-4"}>{result.discrepancies.map((item) => <DiscrepancyCard key={item.id} caseId={caseId} item={item} receivingAnchor={receivingAnchor} compact={compact} />)}</section>
+      {showTimeline && <ActionTimeline caseId={caseId} outcome="discrepancy" approvalPending={approvalPending} />}
     </div>
   );
 }
