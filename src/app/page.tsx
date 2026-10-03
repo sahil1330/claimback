@@ -1,53 +1,256 @@
 import Link from "next/link";
-import { ArrowRight, ArrowUpRight, Camera, Check, FileCheck2, PackageCheck, ShieldCheck } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowRight,
+  ArrowUpRight,
+  Camera,
+  Check,
+  FileCheck2,
+  PackageCheck,
+  ShieldCheck,
+} from "lucide-react";
 import { DemoDownloads } from "../components/marketing/demo-downloads";
 
 const truths = [
-  { name: "Promised", value: "50 boxes · ₹428 · 10+1", tone: "bg-[#e8f4e8] text-[#215d3f]" },
-  { name: "Billed", value: "50 boxes · ₹441", tone: "bg-[#f4f0e5] text-[#695a31]" },
-  { name: "Received", value: "48 paid · 3 free · 2 damaged", tone: "bg-[#f7ece7] text-[#82523e]" },
-];
+  { number: "01", name: "Promised", value: "50 boxes", detail: "₹428 each · 10+1 free" },
+  { number: "02", name: "Billed", value: "50 boxes", detail: "₹441 each" },
+  { number: "03", name: "Received", value: "48 paid", detail: "3 free · 2 damaged" },
+] as const;
+
 const differences = [
   ["Short delivery", "₹882"],
   ["Rate mismatch", "₹598"],
   ["Missing free units", "₹856"],
   ["Damaged goods", "₹882"],
-];
+] as const;
+
 const steps = [
-  { icon: Camera, title: "Capture the three truths", body: "Add the supplier promise, invoice and what actually arrived. Each fact stays attached to its source." },
-  { icon: FileCheck2, title: "See the exact difference", body: "AI reads messy evidence. Deterministic checks calculate the recovery amount in paise." },
-  { icon: PackageCheck, title: "Recover, then verify", body: "Approve before a claim is sent. Later evidence must prove a promised credit arrived." },
-];
+  {
+    icon: Camera,
+    number: "01",
+    title: "Capture what happened.",
+    body: "Add the supplier promise, the invoice and what actually arrived. Every fact stays linked to its evidence.",
+  },
+  {
+    icon: FileCheck2,
+    number: "02",
+    title: "See the exact difference.",
+    body: "AI reads the messy inputs. Deterministic checks calculate what is owed in integer paise.",
+  },
+  {
+    icon: PackageCheck,
+    number: "03",
+    title: "Recover and verify.",
+    body: "You approve before a claim goes out. A later credit note or replacement must prove recovery.",
+  },
+] as const;
+
+function Brand({ light = false }: { light?: boolean }) {
+  return (
+    <Link href="/" className="inline-flex items-center gap-2.5 text-xl font-black tracking-[-0.05em]" aria-label="ClaimBack home">
+      <span className={light
+        ? "flex size-9 items-center justify-center rounded-full bg-[#9fe870] text-[#163300]"
+        : "flex size-9 items-center justify-center rounded-full bg-[#163300] text-[#9fe870]"}>
+        <ShieldCheck className="size-5" strokeWidth={2.4} aria-hidden="true" />
+      </span>
+      <span>ClaimBack</span>
+    </Link>
+  );
+}
+
+function LiveDemoLink({ inverse = false }: { inverse?: boolean }) {
+  return (
+    <Link
+      href="/app"
+      className={inverse
+        ? "inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-[#9fe870] px-6 py-3 text-sm font-bold text-[#163300] transition-colors hover:bg-[#b8f18e]"
+        : "inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-[#163300] px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-[#054d28]"}
+    >
+      Open live demo <ArrowUpRight className="size-4" aria-hidden="true" />
+    </Link>
+  );
+}
 
 export default function Home() {
   return (
-    <main className="min-h-screen overflow-hidden bg-[#f8f8f3] text-[#18251f]">
-      <div className="bg-[#163e2d] text-white">
-        <header className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-5 py-5 sm:px-8 lg:px-12">
-          <Link href="/" className="inline-flex items-center gap-2.5 text-xl font-bold tracking-tight" aria-label="ClaimBack home"><span className="flex size-9 items-center justify-center rounded-xl bg-[#c9e98d] text-[#173b29]"><ShieldCheck className="size-5" aria-hidden="true" /></span>ClaimBack</Link>
-          <nav className="hidden items-center gap-8 text-sm text-white/75 md:flex" aria-label="Main navigation"><a href="#how-it-works" className="hover:text-white">How it works</a><a href="#verified-recovery" className="hover:text-white">Verified recovery</a></nav>
-          <Link href="/app" className="inline-flex min-h-10 items-center gap-2 rounded-full border border-white/30 px-4 py-2 text-sm font-semibold hover:bg-white hover:text-[#163e2d]">Open live demo <ArrowUpRight className="size-4" aria-hidden="true" /></Link>
-        </header>
-        <section className="mx-auto grid max-w-7xl items-center gap-12 px-5 pb-20 pt-14 sm:px-8 sm:pt-20 lg:grid-cols-2 lg:gap-16 lg:px-12 lg:pb-28 lg:pt-28">
+    <main className="min-h-screen overflow-x-clip bg-white text-[#163300]">
+      <header className="sticky top-0 z-50 border-b border-[#e8ebe6] bg-white/95 backdrop-blur-sm">
+        <div className="mx-auto flex min-h-18 max-w-[1200px] items-center justify-between gap-4 px-5 sm:px-8">
+          <Brand />
+          <nav aria-label="Main navigation" className="hidden items-center gap-1 rounded-full bg-[#e8ebe6] p-1 md:flex">
+            <a href="#how-it-works" className="rounded-full px-4 py-2 text-sm font-semibold transition-colors hover:bg-white">How it works</a>
+            <a href="#verified-recovery" className="rounded-full px-4 py-2 text-sm font-semibold transition-colors hover:bg-white">Verified recovery</a>
+            <a href="#demo-kit" className="rounded-full px-4 py-2 text-sm font-semibold transition-colors hover:bg-white">Demo kit</a>
+          </nav>
+          <div className="flex items-center gap-4">
+            <Link href="/login" className="hidden text-sm font-semibold hover:underline sm:inline">Log in</Link>
+            <Link href="/app" className="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-[#163300] px-4 py-2 text-xs font-bold transition-colors hover:bg-[#e2f6d5] sm:text-sm">
+              <span className="sm:hidden">Demo</span><span className="hidden sm:inline">Open demo</span><ArrowUpRight className="size-4" aria-hidden="true" />
+            </Link>
+          </div>
+        </div>
+      </header>
+
+      <section className="mx-auto max-w-[1200px] px-5 pb-20 pt-18 text-center sm:px-8 sm:pb-28 sm:pt-24 lg:pt-28">
+        <p className="mx-auto inline-flex items-center gap-2 rounded-full bg-[#e2f6d5] px-4 py-2 text-[11px] font-bold uppercase tracking-[0.15em] text-[#163300] sm:text-xs">
+          <span className="size-2 rounded-full bg-[#054d28]" aria-hidden="true" />
+          AI margin protector for merchants
+        </p>
+        <h1 className="mx-auto mt-8 max-w-[12ch] text-[clamp(3.1rem,8.6vw,8rem)] font-black uppercase leading-[0.86] tracking-[-0.075em] text-[#0e0f0c]">
+          Stop losing<br /><span className="text-[#163300]">margin.</span>
+        </h1>
+        <p className="mt-7 text-xl font-bold tracking-[-0.03em] text-[#163300] sm:text-2xl">Before stock hits the shelf.</p>
+        <p className="mx-auto mt-5 max-w-[43rem] text-base leading-7 text-[#454745] sm:text-lg sm:leading-8">
+          ClaimBack compares what suppliers promised, what they billed and what arrived. Then it follows every claim until the money or stock actually comes back.
+        </p>
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
+          <LiveDemoLink />
+          <a href="#how-it-works" className="inline-flex min-h-12 items-center gap-2 px-2 text-sm font-bold underline decoration-[#163300]/40 underline-offset-4 hover:decoration-[#163300]">
+            See how it works <ArrowDown className="size-4" aria-hidden="true" />
+          </a>
+        </div>
+        <p className="mt-7 text-xs text-[#6a6c6a]">Your approval comes before a supplier-facing claim.</p>
+      </section>
+
+      <section aria-labelledby="three-truths-title" className="bg-[#163300] px-5 py-18 text-white sm:px-8 lg:py-24">
+        <div className="mx-auto max-w-[1200px]">
+          <div className="flex flex-wrap items-end justify-between gap-6">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.17em] text-[#9fe870]">One delivery. Three truths.</p>
+              <h2 id="three-truths-title" className="mt-4 max-w-[12ch] text-[clamp(2.8rem,5.5vw,5.5rem)] font-black leading-[0.95] tracking-[-0.065em]">
+                Know where the margin went.
+              </h2>
+            </div>
+            <p className="max-w-xs text-sm leading-6 text-white/75">A source-linked example from the synthetic files included with the live demo.</p>
+          </div>
+          <div className="mt-11 grid gap-3 md:grid-cols-3">
+            {truths.map((truth) => (
+              <article key={truth.name} className="min-h-48 rounded-[10px] bg-white p-6 text-[#163300]">
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-xs font-black uppercase tracking-[0.16em]">{truth.name}</p>
+                  <span className="font-mono text-xs text-[#555a55]">{truth.number}</span>
+                </div>
+                <p className="mt-9 text-4xl font-black tracking-[-0.06em] sm:text-5xl">{truth.value}</p>
+                <p className="mt-2 text-sm text-[#454745]">{truth.detail}</p>
+              </article>
+            ))}
+          </div>
+          <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_auto]">
+            <div className="rounded-[10px] bg-[#054d28] p-6 sm:p-8">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#b5e59b]">Grounded differences</p>
+                <span className="rounded-full border border-white/30 px-3 py-1 text-xs font-semibold">4 found</span>
+              </div>
+              <div className="mt-5 grid gap-x-8 gap-y-3 sm:grid-cols-2">
+                {differences.map(([name, amount]) => (
+                  <div key={name} className="flex items-center justify-between gap-4 border-b border-white/20 pb-2 text-sm">
+                    <span className="text-white/80">{name}</span>
+                    <strong className="font-mono text-white">{amount}</strong>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="flex min-w-0 flex-col justify-between rounded-[10px] bg-[#9fe870] p-6 text-[#163300] sm:p-8">
+              <p className="text-xs font-black uppercase tracking-[0.16em]">Potential recovery</p>
+              <p className="mt-8 font-mono text-[clamp(2.6rem,5vw,4.5rem)] font-bold leading-none tracking-[-0.08em]">₹3,218</p>
+              <p className="mt-3 text-xs leading-5">Calculated from this synthetic delivery. Recovery is verified later.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="how-it-works" className="scroll-mt-24 bg-white px-5 py-20 sm:px-8 lg:py-30">
+        <div className="mx-auto max-w-[1200px]">
+          <p className="text-xs font-bold uppercase tracking-[0.17em] text-[#054d28]">How ClaimBack works</p>
+          <div className="mt-4 flex flex-wrap items-end justify-between gap-6">
+            <h2 className="max-w-[14ch] text-[clamp(2.8rem,5.6vw,5.75rem)] font-black leading-[0.95] tracking-[-0.065em] text-[#0e0f0c]">Messy deliveries.<br />Clear answers.</h2>
+            <p className="max-w-sm text-base leading-7 text-[#6a6c6a]">From the first invoice to the final verified credit, every step has a purpose.</p>
+          </div>
+          <div className="mt-14 grid gap-10 md:grid-cols-3 md:gap-8">
+            {steps.map((step) => (
+              <article key={step.title} className="border-t border-[#163300] pt-6">
+                <div className="flex items-start justify-between">
+                  <step.icon className="size-7 text-[#163300]" strokeWidth={1.8} aria-hidden="true" />
+                  <span className="font-mono text-sm text-[#555a55]">{step.number}</span>
+                </div>
+                <h3 className="mt-8 max-w-[13ch] text-2xl font-bold leading-tight tracking-[-0.035em] text-[#0e0f0c]">{step.title}</h3>
+                <p className="mt-3 max-w-sm text-sm leading-7 text-[#6a6c6a]">{step.body}</p>
+              </article>
+            ))}
+          </div>
+          <p className="mt-13 inline-flex items-center gap-2 rounded-full bg-[#e2f6d5] px-4 py-2 text-xs font-semibold text-[#163300]">
+            <Check className="size-4" aria-hidden="true" />
+            Clean delivery? No claim required.
+          </p>
+        </div>
+      </section>
+
+      <section id="verified-recovery" className="scroll-mt-24 bg-[#e2f6d5] px-5 py-20 sm:px-8 lg:py-28">
+        <div className="mx-auto grid max-w-[1200px] items-center gap-12 lg:grid-cols-[1fr_0.9fr] lg:gap-20">
           <div>
-            <span className="inline-flex items-center gap-2 rounded-full border border-[#8bc68e]/40 bg-[#2a5841] px-3 py-1.5 text-xs font-bold uppercase tracking-[0.17em] text-[#c9e98d]"><span className="size-1.5 rounded-full bg-[#c9e98d]" />AI margin protector for merchants</span>
-            <h1 className="mt-7 max-w-[12ch] text-[clamp(3.4rem,7vw,6.5rem)] font-semibold leading-[0.99] tracking-[-0.065em]">Stop losing margin <span className="text-[#c9e98d]">before stock hits the shelf.</span></h1>
-            <p className="mt-7 max-w-xl text-lg leading-8 text-[#d4e3d8]">ClaimBack reads supplier promises, invoices and deliveries, catches leakage, and follows every claim until the money or stock actually comes back.</p>
-            <div className="mt-9 flex flex-col gap-3 sm:flex-row"><Link href="/app" className="inline-flex min-h-13 items-center justify-center gap-2 rounded-xl bg-[#c9e98d] px-6 py-3 font-semibold text-[#183d2b] hover:bg-[#d8f4aa]">Open live demo <ArrowRight className="size-5" aria-hidden="true" /></Link><a href="#how-it-works" className="inline-flex min-h-13 items-center justify-center rounded-xl border border-white/30 px-6 py-3 font-semibold hover:bg-white/10">See how it works</a></div>
-            <p className="mt-5 flex items-center gap-2 text-sm text-[#bfd3c3]"><Check className="size-4 text-[#c9e98d]" aria-hidden="true" />Evidence linked to every claim. You approve before sending.</p>
+            <p className="text-xs font-bold uppercase tracking-[0.17em] text-[#054d28]">The part most tools forget</p>
+            <h2 className="mt-4 max-w-[11ch] text-[clamp(2.8rem,5.5vw,5.5rem)] font-black leading-[0.95] tracking-[-0.065em] text-[#0e0f0c]">
+              A promise is not payment.
+            </h2>
+            <p className="mt-7 max-w-xl text-base leading-8 text-[#454745] sm:text-lg">
+              “Next invoice mein adjust kar denge” leaves money outstanding. ClaimBack keeps the case open until a later invoice, credit note or replacement proves the recovery.
+            </p>
+            <Link href="/app" className="mt-7 inline-flex items-center gap-2 text-sm font-bold underline underline-offset-4">
+              Follow a live case <ArrowRight className="size-4" aria-hidden="true" />
+            </Link>
           </div>
-          <div className="min-w-0 rounded-[1.7rem] border border-white/20 bg-[#f9faf5] p-3 text-[#1b2921] shadow-[0_32px_90px_rgba(3,24,13,0.28)] sm:p-5">
-            <div className="flex items-center justify-between gap-3 border-b border-[#e1e7dd] px-2 pb-4 pt-1 sm:px-3"><div><p className="text-xs font-bold uppercase tracking-[0.15em] text-[#54705b]">Receiving review</p><p className="mt-1 text-sm font-semibold">Invoice INV-3812</p></div><span className="rounded-full bg-[#e8f4e8] px-3 py-1.5 text-xs font-semibold text-[#236946]">Synthetic demo</span></div>
-            <div className="grid gap-2 py-4 sm:grid-cols-3">{truths.map((truth) => <div key={truth.name} className={`min-w-0 rounded-xl p-3.5 ${truth.tone}`}><p className="text-[11px] font-bold uppercase tracking-[0.12em]">{truth.name}</p><p className="mt-2 text-sm font-semibold leading-5">{truth.value}</p></div>)}</div>
-            <div className="rounded-2xl border border-[#e2e8dd] bg-white p-4 sm:p-5"><div className="flex items-center justify-between gap-3"><p className="text-sm font-semibold">Grounded differences</p><span className="text-xs text-[#64806c]">4 found</span></div><div className="mt-3 divide-y divide-[#edf0ea]">{differences.map(([label, amount]) => <div key={label} className="flex justify-between gap-4 py-2.5 text-sm"><span className="text-[#56675a]">{label}</span><strong className="font-mono tabular-nums">{amount}</strong></div>)}</div><div className="mt-2 flex items-baseline justify-between gap-4 rounded-xl bg-[#e8f4e8] px-4 py-3"><span className="text-sm font-semibold text-[#245b3e]">Potential recovery</span><strong className="font-mono text-2xl tabular-nums text-[#176b46]">₹3,218</strong></div><p className="mt-3 text-xs leading-5 text-[#6c796f]">Illustrative result from included synthetic evidence. Recovery requires later proof.</p></div>
+          <div className="rounded-[28px] bg-white p-6 text-[#163300] shadow-[0_16px_48px_rgba(22,51,0,0.08)] sm:p-8">
+            <div className="flex items-center justify-between gap-3 border-b border-[#e8ebe6] pb-5">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#6a6c6a]">Recovery memory</p>
+                <p className="mt-1 text-lg font-bold">Invoice INV-3812</p>
+              </div>
+              <span className="rounded-full bg-[#e2f6d5] px-3 py-1 text-xs font-bold">Synthetic case</span>
+            </div>
+            <ol className="mt-6 space-y-5">
+              {[
+                ["Claim approved", "Merchant authorizes the supplier message."],
+                ["Credit promised", "₹3,218 remains outstanding."],
+                ["Later evidence checked", "Posted credit note matches the claim."],
+                ["Recovery verified", "₹3,218 recovered · case closed."],
+              ].map(([title, detail], index) => (
+                <li key={title} className="flex gap-4">
+                  <span className={index === 3
+                    ? "flex size-8 shrink-0 items-center justify-center rounded-full bg-[#163300] text-[#9fe870]"
+                    : "flex size-8 shrink-0 items-center justify-center rounded-full bg-[#e2f6d5] text-[#163300]"}>
+                    <Check className="size-4" aria-hidden="true" />
+                  </span>
+                  <div>
+                    <p className="text-sm font-bold">{title}</p>
+                    <p className="mt-1 text-sm leading-6 text-[#6a6c6a]">{detail}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+            <p className="mt-7 rounded-[10px] bg-[#e8ebe6] p-3 text-xs leading-5 text-[#555a55]">
+              Illustrative completed path using synthetic evidence. The live product verifies posted recovery before closing.
+            </p>
           </div>
-        </section>
-      </div>
+        </div>
+      </section>
+
       <DemoDownloads />
-      <section className="border-b border-[#e2e8de] bg-[#eff3eb]"><div className="mx-auto grid max-w-7xl gap-5 px-5 py-7 text-sm font-medium text-[#41624a] sm:grid-cols-3 sm:px-8 lg:px-12">{["Every amount linked to evidence", "No claim without your approval", "No case closed on a promise"].map((item) => <p key={item} className="flex items-center gap-2"><Check className="size-4 shrink-0 text-[#176b46]" aria-hidden="true" />{item}</p>)}</div></section>
-      <section id="how-it-works" className="mx-auto max-w-7xl scroll-mt-8 px-5 py-20 sm:px-8 lg:px-12 lg:py-28"><div className="max-w-2xl"><p className="text-xs font-bold uppercase tracking-[0.17em] text-[#176b46]">How ClaimBack works</p><h2 className="mt-3 text-4xl font-semibold tracking-[-0.045em] sm:text-5xl">From messy evidence to money back.</h2><p className="mt-4 text-lg leading-8 text-[#627167]">One clear workflow for the stock that was promised, billed and delivered.</p></div><div className="mt-10 grid gap-4 md:grid-cols-3">{steps.map((step, index) => <article key={step.title} className="rounded-2xl border border-[#e0e7dc] bg-white p-6 shadow-[0_7px_28px_rgba(30,59,35,0.04)]"><div className="flex items-center justify-between"><span className="flex size-12 items-center justify-center rounded-xl bg-[#eaf3e8] text-[#176b46]"><step.icon className="size-6" aria-hidden="true" /></span><span className="font-mono text-sm text-[#839389]">0{index + 1}</span></div><h3 className="mt-8 text-xl font-semibold tracking-tight">{step.title}</h3><p className="mt-3 text-sm leading-7 text-[#627167]">{step.body}</p></article>)}</div></section>
-      <section id="verified-recovery" className="scroll-mt-8 bg-[#eaf0e5] px-5 py-20 sm:px-8 lg:py-28"><div className="mx-auto grid max-w-7xl items-center gap-10 lg:grid-cols-2 lg:gap-20 lg:px-4"><div><p className="text-xs font-bold uppercase tracking-[0.17em] text-[#176b46]">The part most tools forget</p><h2 className="mt-3 max-w-xl text-4xl font-semibold tracking-[-0.045em] sm:text-5xl">A promise to credit you is not recovery.</h2><p className="mt-5 max-w-lg text-lg leading-8 text-[#566b5b]">When a supplier says “we&apos;ll adjust it next invoice,” ClaimBack keeps the amount open. The case resolves only when a later invoice, credit note or replacement proves it arrived.</p><Link href="/app" className="mt-7 inline-flex items-center gap-2 font-semibold text-[#176b46] hover:underline">See the live workflow <ArrowRight className="size-4" aria-hidden="true" /></Link></div><div className="rounded-[1.5rem] border border-[#d6e2d3] bg-white p-5 shadow-[0_18px_55px_rgba(25,61,36,0.07)] sm:p-8"><p className="text-xs font-bold uppercase tracking-[0.15em] text-[#627167]">Recovery timeline</p><ol className="mt-6 space-y-5">{[["Claim approved and sent", "Merchant decision recorded"], ["Supplier promises a later credit", "₹3,218 still outstanding"], ["New evidence checked", "Posted credit note matched to claim"], ["Recovery verified", "₹3,218 recovered · case closed"]].map(([title, detail], index) => <li key={title} className="flex gap-4"><span className={`flex size-7 shrink-0 items-center justify-center rounded-full ${index === 3 ? "bg-[#176b46] text-white" : "bg-[#e9f4e9] text-[#176b46]"}`}><Check className="size-4" aria-hidden="true" /></span><div><p className="text-sm font-semibold">{title}</p><p className="mt-1 text-sm text-[#627167]">{detail}</p></div></li>)}</ol><p className="mt-6 rounded-lg bg-[#eff6ec] p-3 text-xs leading-5 text-[#54705b]">Illustrative completed path using synthetic evidence; the live product verifies posted recovery before closing.</p></div></div></section>
-      <footer className="bg-[#163e2d] px-5 py-12 text-white sm:px-8"><div className="mx-auto flex max-w-7xl flex-col justify-between gap-8 lg:flex-row lg:items-end lg:px-4"><div><p className="text-2xl font-semibold tracking-tight">ClaimBack</p><p className="mt-2 text-sm text-[#c5d7ca]">Protect the margin you have already earned.</p><p className="mt-4 max-w-lg text-xs leading-5 text-[#a6c3ae]">Standalone hackathon prototype. Paytm for Business and Soundbox-like reminders are future distribution ideas, not active integrations.</p></div><Link href="/app" className="inline-flex w-fit items-center gap-2 rounded-xl bg-[#c9e98d] px-5 py-3 font-semibold text-[#183d2b] hover:bg-[#d8f4aa]">Open live demo <ArrowUpRight className="size-4" aria-hidden="true" /></Link></div></footer>
+
+      <footer className="bg-[#163300] px-5 pb-10 pt-20 text-white sm:px-8 lg:pt-24">
+        <div className="mx-auto max-w-[1200px]">
+          <p className="text-xs font-bold uppercase tracking-[0.17em] text-[#9fe870]">Keep what you earned</p>
+          <div className="mt-4 flex flex-wrap items-end justify-between gap-8 border-b border-white/25 pb-16">
+            <h2 className="max-w-[12ch] text-[clamp(3rem,6vw,6rem)] font-black uppercase leading-[0.9] tracking-[-0.07em] text-[#9fe870]">Your margin.<br />Protected.</h2>
+            <LiveDemoLink inverse />
+          </div>
+          <div className="flex flex-wrap items-start justify-between gap-6 py-8">
+            <Brand light />
+            <p className="max-w-md text-xs leading-6 text-white/65">
+              Standalone hackathon prototype. Paytm for Business and Soundbox-like reminders are future distribution ideas, not active integrations.
+            </p>
+          </div>
+        </div>
+      </footer>
     </main>
   );
 }
