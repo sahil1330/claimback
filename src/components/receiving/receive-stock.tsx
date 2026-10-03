@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
-import { ArrowRight, Bot, Check, CheckCircle2, ChevronDown, FileCheck2, FilePlus2, LoaderCircle, Paperclip, Send, ShieldCheck, Sparkles, X } from "lucide-react";
+import { ArrowRight, Bot, Check, CheckCircle2, ChevronDown, FileCheck2, FilePlus2, LoaderCircle, Paperclip, Send, ShieldCheck, Sparkles, Volume2, X } from "lucide-react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { formatPaise } from "@/components/dashboard/metrics";
@@ -20,6 +20,7 @@ import {
 import { initialReceivingDrafts, prepareCaseFacts, type ReceivingDraft } from "./prepare-facts";
 import { SourceConfirmation, type SourceConfirmationSubmission } from "./source-confirmation";
 import { VoiceReceivingNote } from "./voice-receiving-note";
+import { useVoiceReply } from "./use-voice-reply";
 
 type InvoiceResult = Awaited<ReturnType<typeof extractInvoice>>;
 type AgreementResult = Awaited<ReturnType<typeof extractAgreement>>;
@@ -31,6 +32,7 @@ type Phase = "invoice" | "invoice-confirm" | "promise" | "promise-confirm" | "re
 const documentAccept = ".pdf,.txt,.png,.jpg,.jpeg,.webp,application/pdf,text/plain,image/png,image/jpeg,image/webp";
 const fieldClass = "min-h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20";
 const scenariosSchema = z.object({ scenarios: z.array(z.object({ id: z.string(), name: z.string() })) });
+const voiceLanguageSchema = z.enum(["en-IN", "hi-IN", "bn-IN", "ta-IN", "te-IN", "kn-IN", "ml-IN", "mr-IN", "gu-IN", "pa-IN", "od-IN"]);
 const responseSchema = z.object({
   caseState: z.string(), acknowledgedPaise: z.number().int().safe(),
   response: z.object({ rawBody: z.string(), needsConfirmation: z.boolean(), decisions: z.array(z.object({
@@ -64,6 +66,7 @@ export function ReceiveStock() {
   const nextActivityId = useRef(1);
   const activeChatActivityId = useRef<number | null>(null);
   const activeChatStartIndex = useRef(0);
+  const activeChatVoiceLanguage = useRef<string | null>(null);
   const feedEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -72,7 +75,8 @@ export function ReceiveStock() {
   const [caseId, setCaseId] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [input, setInput] = useState("");
-  const [askMode, setAskMode] = useState(false);
+  const [voiceDraftLanguage, setVoiceDraftLanguage] = useState<string | null>(null);
+  const [voiceReplyActivityId, setVoiceReplyActivityId] = useState<number | null>(null);
   const [receivingText, setReceivingText] = useState("");
   const [invoiceResult, setInvoiceResult] = useState<InvoiceResult | null>(null);
   const [agreementResult, setAgreementResult] = useState<AgreementResult | null>(null);
@@ -102,7 +106,8 @@ export function ReceiveStock() {
   const openObligations = recoveryHistory?.obligations.filter((item) => item.outstanding_paise > 0) ?? [];
   const phase: Phase = resolved ? "resolved" : result?.outcome === "clean" ? "clean" : claimSent ? openObligations.length > 0 ? "recovery" : "supplier" : result?.outcome === "discrepancy" ? "approval" : agreementResult?.status === "needs_confirmation" ? "promise-confirm" : invoiceResult?.status === "needs_confirmation" ? "invoice-confirm" : !invoice ? "invoice" : !agreement ? "promise" : receivingResult ? "counts" : "receiving";
   const transport = useMemo(() => new DefaultChatTransport<ClaimBackAgentUIMessage>({ api: "/api/agent", body: caseId ? { caseId } : {} }), [caseId]);
-  const { messages, status: chatStatus, sendMessage } = useChat<ClaimBackAgentUIMessage>({ transport });
+  const { messages, status: chatStatus, error: chatError, sendMessage } = useChat<ClaimBackAgentUIMessage>({ transport });
+  const { speak, replay, stop, status: voiceReplyStatus, error: voiceReplyError, hasAudio } = useVoiceReply();
 
   useEffect(() => { feedEndRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }); }, [activities, phase]);
   useEffect(() => {
@@ -111,8 +116,20 @@ export function ReceiveStock() {
     const answer = [...messages.slice(activeChatStartIndex.current)].reverse().find((message) => message.role === "assistant");
     const text = answer?.parts.filter((part) => part.type === "text").map((part) => part.text).join("\n") ?? "";
     if (text) setActivities((current) => current.map((item) => item.id === id ? { ...item, text, state: chatStatus === "ready" ? "done" : "running" } : item));
-    if (chatStatus === "ready" && text) activeChatActivityId.current = null;
-  }, [messages, chatStatus]);
+    if (chatStatus === "error" || chatError) {
+      setActivities((current) => current.map((item) => item.id === id ? { ...item, text: "I couldn’t answer just now. Please try again.", state: "error" } : item));
+      activeChatActivityId.current = null;
+      activeChatVoiceLanguage.current = null;
+    } else if (chatStatus === "ready") {
+      if (!text) setActivities((current) => current.map((item) => item.id === id ? { ...item, text: "I couldn’t answer just now. Please try again.", state: "error" } : item));
+      else if (activeChatVoiceLanguage.current) {
+        setVoiceReplyActivityId(id);
+        void speak(text, activeChatVoiceLanguage.current);
+      }
+      activeChatActivityId.current = null;
+      activeChatVoiceLanguage.current = null;
+    }
+  }, [messages, chatStatus, chatError, speak]);
   useEffect(() => {
     if (!claimSent) return;
     let active = true;
@@ -125,6 +142,15 @@ export function ReceiveStock() {
   function add(kind: Activity["kind"], text: string, state?: Activity["state"], detail?: string) {
     const id = nextActivityId.current++;
     setActivities((current) => [...current, { id, kind, text, state, detail }]);
+    return id;
+  }
+  function addReply(text: string, voiceLanguage: string | null = null) {
+    const id = add("assistant", text);
+    if (voiceLanguage) {
+      stop();
+      setVoiceReplyActivityId(id);
+      void speak(text, voiceLanguage, true);
+    }
     return id;
   }
   function update(id: number, changes: Partial<Activity>) {
@@ -169,7 +195,7 @@ export function ReceiveStock() {
     finally { setBusy(null); }
   }
 
-  async function runAgreement(promiseFile: File, noteToProcess?: string) {
+  async function runAgreement(promiseFile: File, noteToProcess?: string, voiceLanguage: string | null = null, clearComposer = false) {
     if (!caseId || !invoice) return;
     setBusy("promise"); setError(null);
     add("you", `Supplier promise: ${promiseFile.name}`);
@@ -177,13 +203,14 @@ export function ReceiveStock() {
       const artifact = await track("Saving the supplier promise", () => uploadReceivingEvidence(caseId, "agreement", promiseFile));
       const extracted = await track("Checking agreed rates and free units", () => extractAgreement(caseId, artifact.artifactId));
       setAgreementResult(extracted);
-      resetFile(); setInput("");
+      resetFile();
       if (extracted.status === "error") throw new Error(extracted.error.message);
-      if (extracted.status === "needs_confirmation") add("assistant", "A promise detail is uncertain. Please check it against the source before I compare the delivery.");
+      if (clearComposer) setInput("");
+      if (extracted.status === "needs_confirmation") addReply("A promise detail is uncertain. Please check it against the source before I compare the delivery.", voiceLanguage);
       else {
         setDrafts(initialReceivingDrafts(invoice, extracted.facts));
-        add("assistant", "Supplier promise understood. Tell me what actually arrived, or review the note you already sent.");
-        if (noteToProcess?.trim()) await processReceivingNote(noteToProcess.trim());
+        addReply("Supplier promise understood. Tell me what actually arrived, or review the note you already sent.", noteToProcess?.trim() ? null : voiceLanguage);
+        if (noteToProcess?.trim()) await processReceivingNote(noteToProcess.trim(), voiceLanguage);
       }
     } catch (cause) { fail(cause, "Promise processing failed."); }
     finally { setBusy(null); }
@@ -247,7 +274,7 @@ export function ReceiveStock() {
     return staged.size;
   }
 
-  async function processReceivingNote(note: string) {
+  async function processReceivingNote(note: string, voiceLanguage: string | null = null) {
     if (!caseId || !invoice || !note.trim()) return;
     setBusy("receiving"); setError(null);
     setReceivingText(note.trim());
@@ -266,7 +293,7 @@ export function ReceiveStock() {
       if (extracted.status === "error") throw new Error(extracted.error.message);
       const staged = applySuggestions(extracted.facts);
       setShowCountReview(true);
-      add("assistant", staged ? `I suggested counts for ${staged} ${staged === 1 ? "product" : "products"}. Please check every number against the stock in front of you.` : "I couldn’t confidently match the note to every product. Enter your actual counts in the review below.");
+      addReply(staged ? `I suggested counts for ${staged} ${staged === 1 ? "product" : "products"}. Please check every number against the stock in front of you.` : "I couldn’t confidently match the note to every product. Enter your actual counts in the review below.", voiceLanguage);
       setInput("");
     } catch (cause) { fail(cause, "Receiving note processing failed."); }
     finally { setBusy(null); }
@@ -345,27 +372,44 @@ export function ReceiveStock() {
     finally { setBusy(null); }
   }
 
-  async function askAgent(question: string) {
+  async function askAgent(question: string, voiceLanguage: string | null) {
+    if (voiceLanguage) { stop(); setVoiceReplyActivityId(null); }
     add("you", question);
-    const id = add("assistant", "Checking the case…", "running");
+    const id = add("assistant", "On it…", "running");
     activeChatActivityId.current = id;
     activeChatStartIndex.current = messages.length;
-    try { await sendMessage({ text: question }); }
-    catch { update(id, { text: "I couldn’t answer that right now. Your delivery is still saved; please retry.", state: "error" }); activeChatActivityId.current = null; }
+    activeChatVoiceLanguage.current = voiceLanguage;
+    try { await sendMessage({ text: question }, voiceLanguage ? { body: { languageCode: voiceLanguage } } : undefined); }
+    catch { update(id, { text: "I couldn’t answer that right now. Please retry.", state: "error" }); activeChatActivityId.current = null; activeChatVoiceLanguage.current = null; }
   }
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy || chatStatus === "streaming" || chatStatus === "submitted") return;
     const text = input.trim();
-    if (askMode && text) { setInput(""); void askAgent(text); return; }
-    if (phase === "invoice") { if (file) { if (text) { setReceivingText(text); add("you", text); setInput(""); } void runInvoice(file); } else if (text) { setReceivingText(text); add("you", text); add("assistant", "I’ve kept your note. Attach the invoice so I can connect it to the delivery."); setInput(""); } return; }
-    if (phase === "promise") { const promise = file ?? (text ? new File([text], "supplier-promise.txt", { type: "text/plain" }) : null); if (promise) void runAgreement(promise, receivingText); return; }
-    if (phase === "receiving" || phase === "counts") { if (text) void processReceivingNote(text); return; }
+    if (phase === "invoice" && file) { void runInvoice(file); return; }
+    if (phase === "promise" && file) { void runAgreement(file, receivingText); return; }
     if (phase === "recovery" && file) { void checkRecovery(file); return; }
-    if (text) { setInput(""); void askAgent(text); }
+    if (text) { setInput(""); setVoiceDraftLanguage(null); void askAgent(text, voiceDraftLanguage); }
   }
-  const composerHint = askMode ? "Ask about this case…" : phase === "invoice" ? "Describe what arrived, or attach an invoice…" : phase === "promise" ? "Paste the supplier’s message, or attach it…" : phase === "receiving" || phase === "counts" ? "Describe the received and damaged quantities…" : phase === "recovery" ? "Ask a question, or attach later credit evidence…" : "Ask ClaimBack about this case…";
-  const canAttach = !askMode && (phase === "invoice" || phase === "promise" || phase === "recovery");
+  function useAsEvidence() {
+    const text = input.trim();
+    if (!text || busy) return;
+    const spokenLanguage = voiceDraftLanguage;
+    setVoiceDraftLanguage(null);
+    if (phase === "invoice") {
+      setReceivingText(text);
+      add("you", text);
+      addReply("I have your arrival details for this session. Send the invoice and supplier promise, then I’ll check the quantities with you.", spokenLanguage);
+      setInput("");
+    } else if (phase === "promise") {
+      void runAgreement(new File([text], "supplier-promise.txt", { type: "text/plain" }), receivingText, spokenLanguage, true);
+    } else if (phase === "receiving" || phase === "counts") {
+      void processReceivingNote(text, spokenLanguage);
+    }
+  }
+  const evidenceAction = phase === "invoice" ? "Use as arrival note" : phase === "promise" ? "Use as supplier promise" : phase === "receiving" || phase === "counts" ? "Use as receiving note" : null;
+  const composerHint = phase === "invoice" ? "Message ClaimBack, or attach an invoice…" : phase === "promise" ? "Message ClaimBack, or attach the supplier promise…" : phase === "receiving" || phase === "counts" ? "Message ClaimBack about this delivery…" : phase === "recovery" ? "Message ClaimBack, or attach later credit evidence…" : "Message ClaimBack about this case…";
+  const canAttach = phase === "invoice" || phase === "promise" || phase === "recovery";
   const submitDisabled = Boolean(busy) || chatStatus === "streaming" || chatStatus === "submitted" || (!input.trim() && !file);
 
   return <div className="mx-auto max-w-4xl space-y-5 pb-12">
@@ -373,7 +417,7 @@ export function ReceiveStock() {
     <section aria-label="ClaimBack delivery conversation" className="overflow-hidden rounded-[1.5rem] border border-border bg-surface shadow-sm">
       <div className="flex items-center justify-between gap-3 border-b border-border bg-[#123f2d] px-4 py-4 text-white sm:px-6"><div className="flex items-center gap-3"><span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/15"><Bot className="size-5" aria-hidden="true" /></span><div><h2 className="text-sm font-semibold">ClaimBack</h2><p className="text-xs text-white/70">Your margin protection teammate</p></div></div><span className="rounded-full border border-white/20 px-3 py-1 text-xs font-medium text-white/85">{phase === "resolved" ? "Recovered" : phase === "clean" ? "Checked" : claimSent ? "Tracking recovery" : caseId ? "Working on delivery" : "Ready"}</span></div>
       <div role="log" aria-label="Delivery progress and messages" aria-live="polite" aria-relevant="additions text" className="max-h-[45vh] min-h-44 space-y-4 overflow-y-auto px-4 py-6 sm:max-h-[min(55vh,600px)] sm:min-h-52 sm:px-8">
-        {activities.map((item) => item.kind === "task" ? <div key={item.id} className="ml-10 flex items-start gap-2 text-sm text-muted"><span className="mt-0.5 flex size-5 shrink-0 items-center justify-center">{item.state === "running" ? <LoaderCircle className="size-4 animate-spin text-primary" aria-hidden="true" /> : item.state === "error" ? <X className="size-4 text-danger" aria-hidden="true" /> : <Check className="size-4 text-primary" aria-hidden="true" />}</span><span>{item.text}</span></div> : <div key={item.id} className={`flex ${item.kind === "you" ? "justify-end" : "items-start gap-3"}`}>{item.kind === "assistant" && <span className="mt-1 flex size-8 shrink-0 items-center justify-center rounded-full bg-success-soft text-primary"><Sparkles className="size-4" aria-hidden="true" /></span>}<div className={`max-w-[min(90%,42rem)] rounded-2xl px-4 py-3 text-sm leading-6 ${item.kind === "you" ? "rounded-tr-sm bg-success-soft" : "rounded-tl-sm bg-surface-soft"}`}>{item.state === "running" && <LoaderCircle className="mr-2 inline size-4 animate-spin text-primary" aria-hidden="true" />}<p className="whitespace-pre-wrap">{item.kind === "assistant" ? inlineEmphasis(item.text) : item.text}</p>{item.detail && <p className="mt-2 text-xs text-muted">{item.detail}</p>}</div></div>)}
+        {activities.map((item) => item.kind === "task" ? <div key={item.id} className="ml-10 flex items-start gap-2 text-sm text-muted"><span className="mt-0.5 flex size-5 shrink-0 items-center justify-center">{item.state === "running" ? <LoaderCircle className="size-4 animate-spin text-primary" aria-hidden="true" /> : item.state === "error" ? <X className="size-4 text-danger" aria-hidden="true" /> : <Check className="size-4 text-primary" aria-hidden="true" />}</span><span>{item.text}</span></div> : <div key={item.id} className={`flex ${item.kind === "you" ? "justify-end" : "items-start gap-3"}`}>{item.kind === "assistant" && <span className="mt-1 flex size-8 shrink-0 items-center justify-center rounded-full bg-success-soft text-primary"><Sparkles className="size-4" aria-hidden="true" /></span>}<div className={`max-w-[min(90%,42rem)] rounded-2xl px-4 py-3 text-sm leading-6 ${item.kind === "you" ? "rounded-tr-sm bg-success-soft" : "rounded-tl-sm bg-surface-soft"}`}>{item.state === "running" && <LoaderCircle className="mr-2 inline size-4 animate-spin text-primary" aria-hidden="true" />}<p className="whitespace-pre-wrap">{item.kind === "assistant" ? inlineEmphasis(item.text) : item.text}</p>{item.detail && <p className="mt-2 text-xs text-muted">{item.detail}</p>}{item.id === voiceReplyActivityId && <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-primary">{voiceReplyStatus === "generating" && <><LoaderCircle className="size-3.5 animate-spin" aria-hidden="true" />Preparing voice reply…</>}{voiceReplyStatus === "playing" && <span role="status">Speaking…</span>}{hasAudio && <button type="button" className="inline-flex min-h-8 items-center gap-1 rounded-md px-2 font-semibold hover:bg-primary/10" onClick={() => void replay()} aria-label="Replay ClaimBack voice reply"><Volume2 className="size-4" aria-hidden="true" />Replay</button>}{voiceReplyError && <span role="status" className="text-muted">{voiceReplyError}</span>}</div>}</div></div>)}
         <div ref={feedEndRef} />
         {invoiceResult?.status === "needs_confirmation" && caseId && <div className="ml-10"><SourceConfirmation key={invoiceResult.facts.source.sourceArtifactId} caseId={caseId} label="Invoice" facts={invoiceResult.facts} confirmations={invoiceResult.confirmations} busy={busy === "confirming"} onSubmit={confirmInvoice} /></div>}
         {agreementResult?.status === "needs_confirmation" && caseId && <div className="ml-10"><SourceConfirmation key={agreementResult.facts.source.sourceArtifactId} caseId={caseId} label="Supplier promise" facts={agreementResult.facts} confirmations={agreementResult.confirmations} busy={busy === "confirming"} onSubmit={confirmAgreement} /></div>}
@@ -388,7 +432,7 @@ export function ReceiveStock() {
         {resolved && <div className="ml-10 flex items-start gap-3 rounded-2xl border border-success/20 bg-success-soft p-5"><CheckCircle2 className="mt-0.5 size-5 text-success" aria-hidden="true" /><div><p className="font-semibold">Case closed after verified recovery</p><p className="mt-1 text-sm text-muted">The evidence and supplier commitment remain in the case record.</p></div></div>}
       </div>
       {error && <p role="alert" className="mx-4 mb-3 rounded-lg bg-danger-soft p-3 text-sm text-danger sm:mx-8">{error}</p>}
-      <form onSubmit={submit} className="border-t border-border bg-[#fbfcfa] px-4 py-4 sm:px-6"><div className="mx-auto max-w-3xl"><div className="flex items-center justify-between gap-3"><p className="text-xs font-semibold text-primary">{phase === "invoice" ? "Start with the invoice" : phase === "promise" ? "Add the supplier promise" : phase === "receiving" || phase === "counts" ? "Tell me what arrived" : phase === "recovery" ? "Check later evidence" : "Continue the conversation"}</p><button type="button" className="text-xs font-semibold text-muted underline-offset-2 hover:text-primary hover:underline" onClick={() => setAskMode((current) => !current)}>{askMode ? "Work on delivery" : "Ask a question"}</button></div>{phase === "invoice" && file && <label className="mt-3 block text-xs font-semibold">Supplier name<input className={`${fieldClass} mt-1`} value={supplierName} maxLength={160} onChange={(event) => setSupplierName(event.target.value)} placeholder="e.g. North Star Pharma" /></label>}{phase === "recovery" && file && <label className="mt-3 block text-xs font-semibold">Document type<select className={`${fieldClass} mt-1`} value={recoveryType} onChange={(event) => setRecoveryType(event.target.value as "credit_note" | "corrected_invoice")}><option value="credit_note">Credit note</option><option value="corrected_invoice">Later or corrected invoice</option></select></label>}{file && <div className="mt-3 flex items-center justify-between gap-2 rounded-lg bg-success-soft px-3 py-2 text-xs"><span className="min-w-0 truncate font-semibold"><FileCheck2 className="mr-2 inline size-4" aria-hidden="true" />{file.name}</span><button type="button" className="flex size-8 shrink-0 items-center justify-center rounded-md hover:bg-primary/10" aria-label="Remove attachment" onClick={resetFile}><X className="size-4" aria-hidden="true" /></button></div>}<label htmlFor="delivery-message" className="sr-only">Message ClaimBack</label><textarea id="delivery-message" className="mt-3 min-h-20 w-full resize-y rounded-xl border border-border bg-surface px-4 py-3 text-base placeholder:text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20" value={input} onChange={(event) => setInput(event.target.value)} placeholder={composerHint} maxLength={4000} disabled={Boolean(busy)} /><div className="mt-2 flex flex-wrap items-center justify-between gap-2"><div className="flex items-center gap-2">{canAttach && <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-border bg-surface px-3 text-xs font-semibold hover:border-primary"><Paperclip className="size-4 text-primary" aria-hidden="true" />Attach {phase === "invoice" ? "invoice" : phase === "promise" ? "promise" : "evidence"}<input ref={fileInputRef} type="file" className="sr-only" accept={documentAccept} disabled={Boolean(busy)} onChange={(event) => setFile(event.target.files?.[0] ?? null)} /></label>}<VoiceReceivingNote disabled={Boolean(busy)} onConfirm={(transcript) => setInput((current) => current.trim() ? `${current.trim()} ${transcript}` : transcript)} /></div><Button type="submit" disabled={submitDisabled}>{busy ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : file ? <FilePlus2 className="size-4" aria-hidden="true" /> : <ArrowRight className="size-4" aria-hidden="true" />}{file ? "Send file" : askMode ? "Ask" : phase === "invoice" ? "Keep note" : phase === "promise" ? "Use promise" : phase === "receiving" || phase === "counts" ? "Use note" : "Send"}</Button></div></div></form>
+      <form onSubmit={submit} className="border-t border-border bg-[#fbfcfa] px-4 py-4 sm:px-6"><div className="mx-auto max-w-3xl"><div className="flex items-center justify-between gap-3"><p className="text-xs font-semibold text-primary">{phase === "invoice" ? "Start with the invoice" : phase === "promise" ? "Add the supplier promise" : phase === "receiving" || phase === "counts" ? "Tell me what arrived" : phase === "recovery" ? "Check later evidence" : "Continue the conversation"}</p><span className="text-xs text-muted">Ask, attach, or speak</span></div>{phase === "invoice" && file && <label className="mt-3 block text-xs font-semibold">Supplier name<input className={`${fieldClass} mt-1`} value={supplierName} maxLength={160} onChange={(event) => setSupplierName(event.target.value)} placeholder="e.g. North Star Pharma" /></label>}{phase === "recovery" && file && <label className="mt-3 block text-xs font-semibold">Document type<select className={`${fieldClass} mt-1`} value={recoveryType} onChange={(event) => setRecoveryType(event.target.value as "credit_note" | "corrected_invoice")}><option value="credit_note">Credit note</option><option value="corrected_invoice">Later or corrected invoice</option></select></label>}{file && <div className="mt-3 flex items-center justify-between gap-2 rounded-lg bg-success-soft px-3 py-2 text-xs"><span className="min-w-0 truncate font-semibold"><FileCheck2 className="mr-2 inline size-4" aria-hidden="true" />{file.name}</span><button type="button" className="flex size-8 shrink-0 items-center justify-center rounded-md hover:bg-primary/10" aria-label="Remove attachment" onClick={resetFile}><X className="size-4" aria-hidden="true" /></button></div>}<label htmlFor="delivery-message" className="sr-only">Message ClaimBack</label><textarea id="delivery-message" className="mt-3 min-h-20 w-full resize-y rounded-xl border border-border bg-surface px-4 py-3 text-base placeholder:text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20" value={input} onChange={(event) => setInput(event.target.value)} placeholder={composerHint} maxLength={4000} disabled={Boolean(busy)} /><div className="mt-2 flex flex-wrap items-center justify-between gap-2"><div className="flex items-center gap-2">{canAttach && <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-border bg-surface px-3 text-xs font-semibold hover:border-primary"><Paperclip className="size-4 text-primary" aria-hidden="true" />Attach {phase === "invoice" ? "invoice" : phase === "promise" ? "promise" : "evidence"}<input ref={fileInputRef} type="file" className="sr-only" accept={documentAccept} disabled={Boolean(busy)} onChange={(event) => setFile(event.target.files?.[0] ?? null)} /></label>}<VoiceReceivingNote disabled={Boolean(busy)} onConfirm={(transcript, languageCode) => { setInput((current) => current.trim() ? `${current.trim()} ${transcript}` : transcript); setVoiceDraftLanguage(voiceLanguageSchema.safeParse(languageCode).data ?? "en-IN"); }} />{evidenceAction && input.trim() && !file && <button type="button" className="min-h-11 rounded-lg px-2 text-xs font-semibold text-primary hover:bg-success-soft" onClick={useAsEvidence}>{evidenceAction}</button>}</div><Button type="submit" disabled={submitDisabled}>{busy ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : file ? <FilePlus2 className="size-4" aria-hidden="true" /> : <ArrowRight className="size-4" aria-hidden="true" />}{file ? "Send file" : "Send"}</Button></div></div></form>
     </section>
   </div>;
 }
