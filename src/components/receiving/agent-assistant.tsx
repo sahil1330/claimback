@@ -9,6 +9,7 @@ import type { ClaimBackAgentUIMessage } from "@/lib/ai/agent";
 
 type AgentAssistantProps = {
   caseId: string | null;
+  chatReady: boolean;
   canFill: boolean;
   busy: boolean;
   locked: boolean;
@@ -59,7 +60,7 @@ function CaseChat({ caseId }: { caseId: string }) {
   );
 }
 
-export function AgentAssistant({ caseId, canFill, busy, locked, note, onNoteChange, onFill }: AgentAssistantProps) {
+export function AgentAssistant({ caseId, chatReady, canFill, busy, locked, note, onNoteChange, onFill }: AgentAssistantProps) {
   const [fillBusy, setFillBusy] = useState(false);
   const [fillMessage, setFillMessage] = useState<string | null>(null);
   const [fillError, setFillError] = useState<string | null>(null);
@@ -91,7 +92,7 @@ export function AgentAssistant({ caseId, canFill, busy, locked, note, onNoteChan
           {fillMessage && <p role="status" className="mt-2 rounded-lg bg-success-soft p-2 text-xs text-primary">{fillMessage}</p>}
           {fillError && <p role="alert" className="mt-2 rounded-lg bg-danger-soft p-2 text-xs text-danger">{fillError} Your note stays available for manual entry.</p>}
         </form>
-        {caseId ? <CaseChat key={caseId} caseId={caseId} /> : <div className="rounded-xl border border-border bg-surface p-4"><div className="flex items-center gap-2 text-sm font-semibold"><MessageCircle className="size-4 text-primary" aria-hidden="true" />Ask about this case</div><p className="mt-3 rounded-lg bg-surface-soft p-3 text-xs leading-5 text-muted">Start with an invoice to create a case. The case assistant will appear here and help you understand the next step.</p></div>}
+        {caseId && chatReady ? <CaseChat key={caseId} caseId={caseId} /> : <div className="rounded-xl border border-border bg-surface p-4"><div className="flex items-center gap-2 text-sm font-semibold"><MessageCircle className="size-4 text-primary" aria-hidden="true" />Ask about this case</div><p className="mt-3 rounded-lg bg-surface-soft p-3 text-xs leading-5 text-muted">{caseId ? "Case chat starts after Check delivery saves your confirmed facts. Use AI note suggestions now to fill counts, then review and confirm them below." : "Start with an invoice to create a case. AI note suggestions will help fill counts after the supplier promise is understood; case chat opens after Check delivery."}</p></div>}
       </div>
     </section>
   );
