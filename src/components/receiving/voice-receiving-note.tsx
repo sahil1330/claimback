@@ -110,14 +110,16 @@ export function VoiceReceivingNote({ disabled, hasExistingNote, onConfirm }: {
   }
 
   return (
-    <div className="mt-4 rounded-xl border border-border bg-surface-soft p-3 sm:p-4" aria-label="Optional voice receiving note">
-      <p className="text-xs font-semibold text-foreground">Or speak what arrived</p>
-      <p className="mt-1 text-xs leading-5 text-muted">Voice is optional. Review the words before they enter your receiving note.</p>
+    <div className="mt-4 rounded-xl border border-primary/25 bg-success-soft/60 p-4 sm:p-5" aria-label="Optional voice receiving note">
+      <div className="flex items-start gap-3">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary text-white"><Mic className="size-5" aria-hidden="true" /></span>
+        <div><p className="text-sm font-semibold text-foreground">Speak what arrived</p><p className="mt-1 text-xs leading-5 text-muted">Record a short note. Review the transcript before it fills your receiving note, or type instead.</p></div>
+      </div>
       {state !== "review" && <div className="mt-3 flex flex-wrap items-center gap-2">
         {state === "recording" ? (
           <Button type="button" variant="outline" className="min-h-11" onClick={() => { if (recorderRef.current?.state === "recording") recorderRef.current.stop(); }}><Square aria-hidden="true" />Stop & transcribe</Button>
         ) : (
-          <Button type="button" variant="outline" className="min-h-11" disabled={disabled || state === "transcribing"} onClick={startRecording}><Mic aria-hidden="true" />Record note</Button>
+          <Button type="button" className="min-h-12 w-full justify-center sm:w-auto" disabled={disabled || state === "transcribing"} onClick={startRecording}><Mic aria-hidden="true" />Record receiving note</Button>
         )}
         <label className={`inline-flex min-h-11 items-center gap-2 rounded-lg border border-border bg-surface px-3 text-xs font-semibold text-foreground ${disabled || state !== "idle" ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}>
           <UploadCloud className="size-4" aria-hidden="true" />Choose audio
