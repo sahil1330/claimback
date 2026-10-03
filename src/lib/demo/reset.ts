@@ -17,8 +17,8 @@ async function checked<T>(operation: PromiseLike<{ data: T; error: { message: st
   return data;
 }
 
-/** Reset only the configured demo merchant. All history is labeled synthetic. */
-export async function resetDemoForCurrentMerchant() {
+/** Reset only the configured demo merchant. Active work needs explicit confirmation. */
+export async function resetDemoForCurrentMerchant({ allowActiveCaseDeletion = false }: { allowActiveCaseDeletion?: boolean } = {}) {
   if (process.env.DEMO_MODE !== "true") throw new DemoResetError("Demo mode is off");
   const expectedEmail = process.env.DEMO_USER_EMAIL?.trim().toLowerCase();
   if (!expectedEmail) throw new DemoResetError("Demo account is not configured");
@@ -29,6 +29,16 @@ export async function resetDemoForCurrentMerchant() {
   }
   const admin = createAdminClient();
   const plan = buildDemoResetPlan(userId);
+  const { data: existingCases, error: existingCaseError } = await admin.from("cases")
+    .select("id").eq("user_id", userId).limit(1000);
+  if (existingCaseError) throw new DemoResetError("Could not inspect existing demo cases");
+  if (!allowActiveCaseDeletion && (existingCases?.length ?? 0) === 1000) {
+    throw new DemoResetError("Too many demo cases to inspect safely. Confirm deleting them before resetting the demo.");
+  }
+  const seedCaseIds = new Set(plan.cases.map((item) => String(item.id)));
+  if (!allowActiveCaseDeletion && (existingCases ?? []).some((item) => !seedCaseIds.has(item.id))) {
+    throw new DemoResetError("Active delivery cases exist. Confirm deleting them before resetting the demo.");
+  }
   const { data: priorArtifacts, error: priorError } = await admin.from("artifacts")
     .select("storage_path").eq("user_id", userId).limit(1000);
   if (priorError) throw new DemoResetError("Could not inspect existing demo evidence");

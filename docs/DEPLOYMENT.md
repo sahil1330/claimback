@@ -35,7 +35,10 @@ Provision the dedicated Sharma Medical user with `pnpm demo:user`, then run
 the demo account three times and verifies merchant-scoped case history, exact
 balances, one open obligation, and readable evidence files. The reset endpoint
 is `POST /api/demo/reset`, requires that configured account's authenticated
-session, and is disabled when `DEMO_MODE` is not `true`.
+session, and is disabled when `DEMO_MODE` is not `true`. A plain reset refuses
+to remove merchant-created cases. To intentionally clear those active cases,
+send JSON `{ "confirmation": "RESET_ALL_DEMO_CASES" }`. Never run a destructive
+reset while another person is using the shared demo account.
 
 Run `pnpm lint`, `pnpm typecheck`, `pnpm test`, and `pnpm build` before deploying.
 After deployment, sign in as the demo user and complete the full recovery path
