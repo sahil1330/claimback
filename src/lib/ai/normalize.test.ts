@@ -99,7 +99,7 @@ describe("source-grounded extraction normalization", () => {
     const suggestion = normalizeReceivingOutput({
       evidence: { excerpt: "Maggi 48 peti aaye, do damage hain", locator: null },
       lines: [{
-        rawName: "Maggi", skuRef: null, unit: "box", packSize: null, receivedQuantity: 48, damagedQuantity: 2,
+        rawName: "Maggi", skuRef: null, unit: "box", packSize: null, receivedQuantity: 48, receivedFreeQuantity: null, damagedQuantity: 2,
         confidence: "high", evidence: { excerpt: "Maggi 48 peti aaye, do damage hain", locator: null },
         uncertainties: [],
       }],
@@ -111,7 +111,7 @@ describe("source-grounded extraction normalization", () => {
 
     const confirmed = confirmReceivingInput({
       source: suggestion.facts.source,
-      lines: [{ rawName: "Maggi", skuRef: null, unit: "box", packSize: null, receivedQuantity: 47, damagedQuantity: 2 }],
+      lines: [{ rawName: "Maggi", skuRef: null, unit: "box", packSize: null, receivedQuantity: 47, receivedFreeQuantity: 0, damagedQuantity: 2 }],
     });
     expect(confirmed.lines[0]).toMatchObject({ receivedQuantity: 47, damagedQuantity: 2, merchantConfirmed: true });
   });
@@ -119,7 +119,7 @@ describe("source-grounded extraction normalization", () => {
   it("rejects damaged units above received units", () => {
     expect(() => confirmReceivingInput({
       source: { sourceArtifactId: source.artifactId, sourceLabel: source.label, excerpt: null, locator: null },
-      lines: [{ rawName: "Maggi", skuRef: null, unit: "box", packSize: null, receivedQuantity: 2, damagedQuantity: 3 }],
+      lines: [{ rawName: "Maggi", skuRef: null, unit: "box", packSize: null, receivedQuantity: 2, receivedFreeQuantity: 0, damagedQuantity: 3 }],
     })).toThrow();
   });
 });

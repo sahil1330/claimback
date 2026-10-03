@@ -42,6 +42,8 @@ export const billedLineSchema = sourceLineSchema.extend({
 
 export const receivedLineSchema = sourceLineSchema.extend({
   receivedQuantity: z.number().int().nonnegative().nullable(),
+  /** Free scheme units counted separately from paid units. */
+  receivedFreeQuantity: z.number().int().nonnegative().nullable(),
   damagedQuantity: z.number().int().nonnegative().nullable(),
   merchantConfirmed: z.boolean(),
 }).refine(
