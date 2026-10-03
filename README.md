@@ -1,36 +1,49 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ClaimBack
 
-## Getting Started
+**ClaimBack is an AI Margin Protector for small merchants.**
 
-First, run the development server:
+It remembers what suppliers promised, checks what they billed and what physically arrived, detects supplier leakage, creates evidence, follows the claim, and verifies that the promised recovery actually happened.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## Core loop
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+**PROMISED vs BILLED vs RECEIVED → DETECT → EVIDENCE → CLAIM → FOLLOW UP → VERIFY → RECOVER**
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Stack
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- Next.js App Router + TypeScript
+- pnpm
+- Tailwind + shadcn/ui
+- Motion
+- Vercel AI SDK + `ToolLoopAgent`
+- direct OpenAI provider via `@ai-sdk/openai`
+- Supabase Auth/Postgres/Storage
+- Zod
+- optional Sarvam voice
+- Vercel
 
-## Learn More
+## Environment
 
-To learn more about Next.js, take a look at the following resources:
+Copy `.env.example` to `.env.local`.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Keep model IDs in environment variables, not scattered through source code.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Golden path
 
-## Deploy on Vercel
+The build is not complete until:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. merchant signs in;
+2. merchant starts `Receive Stock`;
+3. invoice is uploaded and parsed;
+4. supplier promise is supplied;
+5. merchant speaks/types what arrived;
+6. ClaimBack finds source-grounded discrepancies;
+7. deterministic code calculates recovery;
+8. merchant approves the claim;
+9. ClaimBack sends through the supplier simulator;
+10. supplier responds or promises later credit;
+11. ClaimBack keeps the obligation open;
+12. later recovery evidence is checked;
+13. exact recovery is verified;
+14. dashboard margin protected updates.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Read `START_HERE.md` and `AGENTS.md` before coding.
