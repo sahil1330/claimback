@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
-import { ShellPreview } from "@/components/dashboard/shell-preview";
+import { loadMerchantHistory } from "@/components/dashboard/load-history";
+import { getDashboardSummary } from "@/components/dashboard/metrics";
+import { DashboardOverview } from "@/components/dashboard/overview";
 
 export const metadata: Metadata = { title: "Overview" };
 
-export default function AppHomePage() {
-  return <ShellPreview />;
+export default async function AppHomePage() {
+  const { cases, suppliers } = await loadMerchantHistory();
+  return <DashboardOverview summary={getDashboardSummary(cases)} suppliers={suppliers} />;
 }
