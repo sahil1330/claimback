@@ -1,0 +1,687 @@
+.scene {
+  container-type: inline-size;
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  color: #163300;
+}
+
+.sceneLabel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .13em;
+}
+
+.sceneLabel > span,
+.captionDot {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 50%;
+  background: #4d7839;
+}
+
+.viewport {
+  container-type: inline-size;
+  width: 100%;
+  aspect-ratio: 40 / 35;
+}
+
+.world {
+  position: relative;
+  width: 40em;
+  height: 35em;
+  margin-inline: auto;
+  font-size: min(16px, 2.5cqw);
+  perspective: 80em;
+}
+
+.halo {
+  position: absolute;
+  inset: 4em 3em 3em;
+  border-radius: 50%;
+  background: #edf4e6;
+}
+
+.orbit {
+  position: absolute;
+  top: 5em;
+  left: 4.5em;
+  width: 31em;
+  height: 23em;
+  border: 1px solid #c5d8b5;
+  border-radius: 50%;
+  transform: rotate(-28deg);
+}
+
+.orbit::after {
+  content: "";
+  position: absolute;
+  top: 2.8em;
+  left: 3.7em;
+  width: .5em;
+  height: .5em;
+  border-radius: 50%;
+  background: #688d4d;
+}
+
+.ground {
+  position: absolute;
+  left: 7em;
+  top: 23em;
+  width: 28em;
+  height: 9em;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, #16330030, #16330012 42%, transparent 70%);
+  transform: rotate(-7deg);
+}
+
+.groundRing {
+  position: absolute;
+  left: 6em;
+  top: 27em;
+  width: 28em;
+  height: 4.6em;
+  border: 1px solid #c5d8b5;
+  border-radius: 50%;
+  transform: rotate(-7deg);
+}
+
+.rig {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  transform: rotateX(var(--scene-pitch, 0deg)) rotateY(var(--scene-yaw, 0deg));
+  transition: transform 600ms cubic-bezier(.2, .7, .2, 1);
+}
+
+.parcelFloat,
+.smallParcelFloat,
+.shieldFloat,
+.coinFloat,
+.smallCoinFloat,
+.receiptFloat {
+  position: absolute;
+  transform-style: preserve-3d;
+  animation: levitate 7s ease-in-out infinite;
+}
+
+.parcelFloat {
+  top: 14em;
+  left: 11em;
+  width: 16em;
+  height: 12em;
+}
+
+.parcel {
+  position: relative;
+  width: 16em;
+  height: 12em;
+  transform-style: preserve-3d;
+  transform: rotateX(-17deg) rotateY(-31deg) rotateZ(-4deg);
+}
+
+.face {
+  position: absolute;
+  border: 1px solid #687a4026;
+  backface-visibility: hidden;
+}
+
+.parcelFront,
+.parcelBack {
+  width: 16em;
+  height: 12em;
+  background: linear-gradient(135deg, #e8edda, #cedbb8);
+}
+
+.parcelFront {
+  transform: translateZ(7em);
+}
+
+.parcelBack {
+  transform: rotateY(180deg) translateZ(7em);
+}
+
+.parcelLeft,
+.parcelRight {
+  left: 1em;
+  width: 14em;
+  height: 12em;
+  background: linear-gradient(110deg, #b7c99e, #94ae7c);
+}
+
+.parcelRight {
+  transform: rotateY(90deg) translateZ(8em);
+}
+
+.parcelLeft {
+  transform: rotateY(-90deg) translateZ(8em);
+}
+
+.parcelTop,
+.parcelBottom {
+  top: -1em;
+  width: 16em;
+  height: 14em;
+  background: linear-gradient(125deg, #fbfced, #e0e9ca);
+}
+
+.parcelTop {
+  transform: rotateX(90deg) translateZ(6em);
+}
+
+.parcelBottom {
+  transform: rotateX(-90deg) translateZ(6em);
+}
+
+.tape {
+  position: absolute;
+  top: 0;
+  left: 6.5em;
+  width: 3em;
+  height: 100%;
+  background: linear-gradient(90deg, #2c5419, #386322 45%, #284c17);
+  border-inline: 1px solid #16330030;
+}
+
+.topSeam {
+  position: absolute;
+  inset: 0 50% 0 auto;
+  width: 1px;
+  background: #869a64;
+}
+
+.boxLogo {
+  position: absolute;
+  top: 3.2em;
+  left: 6.9em;
+  width: 2.2em;
+  height: 2.2em;
+  color: #c0f79b;
+}
+
+.shippingLabel {
+  position: absolute;
+  left: 1.25em;
+  bottom: 1.5em;
+  display: flex;
+  flex-direction: column;
+  gap: .25em;
+  width: 4.1em;
+  padding: .5em;
+  background: #fffff5;
+  border-radius: .15em;
+  color: #334529;
+}
+
+.shippingLabel > strong {
+  font-size: .52em;
+  letter-spacing: .08em;
+}
+
+.shippingLabel > span:not(.barcode) {
+  font-size: .3em;
+  letter-spacing: .03em;
+}
+
+.barcode,
+.receiptBarcode {
+  display: block;
+  height: .85em;
+  background: repeating-linear-gradient(90deg, #163300 0 1px, transparent 1px 3px, #163300 3px 5px, transparent 5px 7px, #163300 7px 8px, transparent 8px 12px);
+  opacity: .75;
+}
+
+.boxNumber {
+  position: absolute;
+  right: 1.5em;
+  bottom: 2em;
+  font-size: .65em;
+  font-weight: 700;
+  letter-spacing: .08em;
+  color: #50623d;
+}
+
+.handling {
+  position: absolute;
+  right: 1.5em;
+  bottom: 2em;
+  display: flex;
+  padding: .5em;
+  border: 1px solid #46632e;
+}
+
+.handling svg {
+  width: 1.6em;
+  height: 1.6em;
+  stroke-width: 1.4;
+}
+
+.sideRule {
+  position: absolute;
+  left: 1em;
+  top: 1em;
+  width: 12em;
+  height: 1px;
+  background: #56783c33;
+}
+
+.smallParcelFloat {
+  top: 11em;
+  left: 5em;
+  animation-delay: -2.5s;
+}
+
+.smallParcelFloat .parcel {
+  transform: translateZ(-9em) scale3d(.52, .52, .52) rotateX(-17deg) rotateY(26deg) rotateZ(4deg);
+}
+
+.smallParcelFloat .parcelFront {
+  background: linear-gradient(135deg, #c1e89a, #91bc63);
+}
+
+.smallParcelFloat .parcelTop {
+  background: #d9f4b6;
+}
+
+.smallParcelFloat .parcelLeft,
+.smallParcelFloat .parcelRight {
+  background: #6c9349;
+}
+
+.shieldFloat {
+  top: 17em;
+  left: 24em;
+  width: 10.5em;
+  height: 12.6em;
+  animation-delay: -1.5s;
+}
+
+.shield {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transform: translateZ(9em) rotateX(7deg) rotateY(-24deg) rotateZ(12deg);
+}
+
+.shieldSlice,
+.shieldFront {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.shieldFront {
+  transform: translateZ(1.04em);
+}
+
+.coinFloat {
+  top: 6em;
+  left: 7em;
+  width: 6.3em;
+  height: 6.3em;
+  animation-delay: -3s;
+}
+
+.coin {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transform: rotateX(14deg) rotateY(-28deg) rotateZ(-14deg);
+}
+
+.coinEdge,
+.coinFront {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+}
+
+.coinEdge {
+  background: #739b43;
+  border: 1px solid #85b452;
+}
+
+.coinFront {
+  display: grid;
+  place-items: center;
+  border: .24em solid #c6f592;
+  outline: 1px solid #7eaf4e;
+  outline-offset: -1px;
+  box-shadow: inset 0 0 0 .1em #85b452, inset .15em .2em .35em #efffc09c;
+  background: linear-gradient(140deg, #d9ffa6, #a4d969 52%, #86ba4c);
+  color: #416c22;
+  font-weight: 700;
+  transform: translateZ(.8em);
+  text-shadow: 0 1px #e2ffba;
+}
+
+.coinFront > span {
+  font-size: 3em;
+}
+
+.smallCoinFloat {
+  top: 8em;
+  left: 32.5em;
+  width: 3.3em;
+  height: 3.3em;
+  animation-delay: -4.5s;
+}
+
+.smallCoinFloat .coin {
+  transform: translateZ(-4em) rotateX(-12deg) rotateY(32deg) rotateZ(18deg);
+}
+
+.smallCoinFloat .coinFront > span {
+  font-size: 1.8em;
+}
+
+.receiptFloat {
+  top: 3em;
+  left: 22em;
+  width: 10.6em;
+  height: 15em;
+  animation-delay: -4s;
+}
+
+.receipt {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  padding: 1.2em;
+  border-radius: .35em .35em 0 0;
+  background: #fffef6;
+  border-top: 1px solid #e5e8dc;
+  box-shadow: .3em .7em 1.5em #19320c17, inset -.2em 0 .5em #b6bf9a20;
+  transform: translateZ(-1em) rotateX(5deg) rotateY(-14deg) rotateZ(13deg);
+}
+
+.receipt::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 -.45em;
+  height: .5em;
+  background: linear-gradient(135deg, #fffef6 25%, transparent 25%) -.5em 0,
+    linear-gradient(225deg, #fffef6 25%, transparent 25%) -.5em 0;
+  background-size: 1em 1em;
+}
+
+.receiptHeading {
+  display: flex;
+  align-items: center;
+  gap: .4em;
+}
+
+.receiptHeading svg {
+  width: 1.25em;
+  height: 1.25em;
+}
+
+.receiptHeading span {
+  font-size: .63em;
+  font-weight: 800;
+  letter-spacing: .02em;
+}
+
+.receiptTitle {
+  margin-top: 1.5em;
+  font-size: .58em;
+  font-weight: 600;
+  letter-spacing: .15em;
+  color: #606d52;
+}
+
+.receiptRule {
+  margin-block: .8em;
+  border-top: 1px dashed #c7d0b8;
+}
+
+.receiptRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: .6em;
+  font-size: .7em;
+  font-weight: 500;
+}
+
+.receiptRow svg {
+  width: 1em;
+  height: 1em;
+}
+
+.receiptStamp {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: .4em;
+  padding-block: .8em;
+  border: 1px solid #80a665;
+  color: #48732f;
+  font-size: .56em;
+  font-weight: 700;
+  transform: rotate(-5deg);
+}
+
+.receiptStamp svg {
+  width: 1.3em;
+  height: 1.3em;
+}
+
+.receiptBarcode {
+  width: 70%;
+  height: 1em;
+  margin: 1.2em auto 0;
+  opacity: .5;
+}
+
+.evidenceTag,
+.recoveryTag {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: .7em;
+  padding: 1em 1.15em;
+  border: 1px solid #16330012;
+  border-radius: .85em;
+  background: #fff;
+  box-shadow: 0 .6em 1.8em #1633000a;
+}
+
+.evidenceTag {
+  top: 22em;
+  left: 1em;
+  transform: rotate(-6deg);
+}
+
+.recoveryTag {
+  right: 1em;
+  bottom: 2.5em;
+  transform: rotate(4deg);
+}
+
+.evidenceTag > span,
+.recoveryTag > span {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 2.1em;
+  height: 2.1em;
+  border-radius: 50%;
+  background: #e2f6d5;
+}
+
+.evidenceTag svg,
+.recoveryTag svg {
+  width: 1.15em;
+  height: 1.15em;
+}
+
+.evidenceTag > div,
+.recoveryTag > div {
+  font-size: .72em;
+  color: #5b6554;
+}
+
+.evidenceTag strong,
+.recoveryTag strong {
+  display: block;
+  margin-top: .25em;
+  color: #163300;
+  font-size: 1.3em;
+  font-weight: 700;
+}
+
+.recoveryTag strong {
+  font-size: 2.1em;
+  letter-spacing: -.04em;
+}
+
+.recoveryTag strong > span {
+  font-size: .45em;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: #5b6554;
+}
+
+.sceneIndex {
+  position: absolute;
+  bottom: 2.5em;
+  left: 4em;
+  font-size: .52em;
+  font-weight: 600;
+  letter-spacing: .13em;
+  color: #556b45;
+}
+
+.caption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  padding-inline: 8px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #606957;
+}
+
+.caption > span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.motionToggle {
+  display: flex;
+  align-items: center;
+  flex: none;
+  gap: 5px;
+  min-height: 44px;
+  padding: 6px 10px;
+  border: 1px solid #d4deca;
+  border-radius: 999px;
+  color: #355127;
+  cursor: pointer;
+  transition: background 180ms ease;
+}
+
+.motionToggle:hover {
+  background: #edf4e6;
+}
+
+.motionToggle:focus-visible {
+  outline: 2px solid #163300;
+  outline-offset: 3px;
+}
+
+.motionToggle svg {
+  width: 11px;
+  height: 11px;
+}
+
+.scene[data-paused="true"] .rig {
+  transform: none;
+}
+
+.scene[data-paused="true"] .parcelFloat,
+.scene[data-paused="true"] .smallParcelFloat,
+.scene[data-paused="true"] .shieldFloat,
+.scene[data-paused="true"] .coinFloat,
+.scene[data-paused="true"] .smallCoinFloat,
+.scene[data-paused="true"] .receiptFloat {
+  animation-play-state: paused;
+}
+
+@keyframes levitate {
+  0%, 100% { translate: 0 0; }
+  50% { translate: 0 -.7em; }
+}
+
+.mobileProof {
+  display: none;
+}
+
+@container (max-width: 480px) {
+  .evidenceTag,
+  .recoveryTag {
+    display: none;
+  }
+
+  .mobileProof {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: -8px;
+    padding: 14px 18px;
+    border: 1px solid #dce5d4;
+    border-radius: 16px;
+    background: #f5f9f0;
+  }
+
+  .mobileProof > span {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #486036;
+    font-size: 12px;
+  }
+
+  .mobileProof svg {
+    width: 15px;
+    height: 15px;
+  }
+
+  .mobileProof > strong {
+    font-size: 24px;
+    letter-spacing: -.04em;
+  }
+
+  .mobileProof > strong > span {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0;
+  }
+}
+
+@media (max-width: 420px) {
+  .sceneLabel { font-size: 8px; letter-spacing: .09em; }
+  .caption { gap: 6px; padding-inline: 0; }
+  .captionDot { display: none; }
+  .motionToggle { padding-inline: 8px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rig { transform: none; transition: none; }
+  .parcelFloat, .smallParcelFloat, .shieldFloat, .coinFloat, .smallCoinFloat, .receiptFloat { animation: none; }
+  .motionToggle { display: none; }
+}

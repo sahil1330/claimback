@@ -10,6 +10,9 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { DemoDownloads } from "../components/marketing/demo-downloads";
+import { MarketingScene } from "../components/marketing/marketing-scene";
+
+const focusStyle = "focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#054d28]";
 
 const truths = [
   { number: "01", name: "Promised", value: "50 boxes", detail: "₹428 each · 10+1 free" },
@@ -35,7 +38,7 @@ const steps = [
     icon: FileCheck2,
     number: "02",
     title: "See the exact difference.",
-    body: "AI reads the messy inputs. Deterministic checks calculate what is owed in integer paise.",
+    body: "AI reads the paperwork and finds the mismatches. Every amount is checked against the original evidence.",
   },
   {
     icon: PackageCheck,
@@ -47,7 +50,7 @@ const steps = [
 
 function Brand({ light = false }: { light?: boolean }) {
   return (
-    <Link href="/" className="inline-flex items-center gap-2.5 text-xl font-black tracking-[-0.05em]" aria-label="ClaimBack home">
+    <Link href="/" className={`inline-flex items-center gap-2.5 rounded-full text-xl font-black tracking-[-0.05em] focus-visible:outline-2 focus-visible:outline-offset-4 ${light ? "focus-visible:outline-[#9fe870]" : "focus-visible:outline-[#054d28]"}`} aria-label="ClaimBack home">
       <span className={light
         ? "flex size-9 items-center justify-center rounded-full bg-[#9fe870] text-[#163300]"
         : "flex size-9 items-center justify-center rounded-full bg-[#163300] text-[#9fe870]"}>
@@ -63,8 +66,8 @@ function LiveDemoLink({ inverse = false }: { inverse?: boolean }) {
     <Link
       href="/app"
       className={inverse
-        ? "inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-[#9fe870] px-6 py-3 text-sm font-bold text-[#163300] transition-colors hover:bg-[#b8f18e]"
-        : "inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-[#163300] px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-[#054d28]"}
+        ? "inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-[#9fe870] px-6 py-3 text-sm font-bold text-[#163300] transition-colors hover:bg-[#b8f18e] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#9fe870]"
+        : `inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-[#163300] px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-[#054d28] ${focusStyle}`}
     >
       Open live demo <ArrowUpRight className="size-4" aria-hidden="true" />
     </Link>
@@ -77,42 +80,50 @@ export default function Home() {
       <header className="sticky top-0 z-50 border-b border-[#e8ebe6] bg-white/95 backdrop-blur-sm">
         <div className="mx-auto flex min-h-18 max-w-[1200px] items-center justify-between gap-4 px-5 sm:px-8">
           <Brand />
-          <nav aria-label="Main navigation" className="hidden items-center gap-1 rounded-full bg-[#e8ebe6] p-1 md:flex">
-            <a href="#how-it-works" className="rounded-full px-4 py-2 text-sm font-semibold transition-colors hover:bg-white">How it works</a>
-            <a href="#verified-recovery" className="rounded-full px-4 py-2 text-sm font-semibold transition-colors hover:bg-white">Verified recovery</a>
-            <a href="#demo-kit" className="rounded-full px-4 py-2 text-sm font-semibold transition-colors hover:bg-white">Demo kit</a>
+          <nav aria-label="Main navigation" className="hidden items-center gap-1 rounded-full bg-[#e8ebe6] p-1 lg:flex">
+            <a href="#how-it-works" className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors hover:bg-white ${focusStyle}`}>How it works</a>
+            <a href="#verified-recovery" className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors hover:bg-white ${focusStyle}`}>Verified recovery</a>
+            <a href="#demo-kit" className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors hover:bg-white ${focusStyle}`}>Demo kit</a>
           </nav>
           <div className="flex items-center gap-4">
-            <Link href="/login" className="hidden text-sm font-semibold hover:underline sm:inline">Log in</Link>
-            <Link href="/app" className="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-[#163300] px-4 py-2 text-xs font-bold transition-colors hover:bg-[#e2f6d5] sm:text-sm">
+            <Link href="/login" className={`hidden rounded-sm text-sm font-semibold hover:underline sm:inline ${focusStyle}`}>Log in</Link>
+            <Link href="/app" className={`inline-flex min-h-10 items-center gap-1.5 rounded-full border border-[#163300] px-4 py-2 text-xs font-bold transition-colors hover:bg-[#e2f6d5] sm:text-sm ${focusStyle}`}>
               <span className="sm:hidden">Demo</span><span className="hidden sm:inline">Open demo</span><ArrowUpRight className="size-4" aria-hidden="true" />
             </Link>
           </div>
         </div>
       </header>
 
-      <section className="mx-auto max-w-[1200px] px-5 pb-20 pt-18 text-center sm:px-8 sm:pb-28 sm:pt-24 lg:pt-28">
-        <p className="mx-auto inline-flex items-center gap-2 rounded-full bg-[#e2f6d5] px-4 py-2 text-[11px] font-bold uppercase tracking-[0.15em] text-[#163300] sm:text-xs">
-          <span className="size-2 rounded-full bg-[#054d28]" aria-hidden="true" />
-          AI margin protector for merchants
-        </p>
-        <h1 className="mx-auto mt-8 max-w-[12ch] text-[clamp(3.1rem,8.6vw,8rem)] font-black uppercase leading-[0.86] tracking-[-0.075em] text-[#0e0f0c]">
-          Stop losing<br /><span className="text-[#163300]">margin.</span>
-        </h1>
-        <p className="mt-7 text-xl font-bold tracking-[-0.03em] text-[#163300] sm:text-2xl">Before stock hits the shelf.</p>
-        <p className="mx-auto mt-5 max-w-[43rem] text-base leading-7 text-[#454745] sm:text-lg sm:leading-8">
-          ClaimBack compares what suppliers promised, what they billed and what arrived. Then it follows every claim until the money or stock actually comes back.
-        </p>
-        <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
-          <LiveDemoLink />
-          <a href="#how-it-works" className="inline-flex min-h-12 items-center gap-2 px-2 text-sm font-bold underline decoration-[#163300]/40 underline-offset-4 hover:decoration-[#163300]">
-            See how it works <ArrowDown className="size-4" aria-hidden="true" />
-          </a>
+      <section className="mx-auto grid max-w-[1200px] items-center gap-8 px-5 pb-12 pt-10 sm:gap-10 sm:px-8 sm:pt-14 lg:grid-cols-[0.9fr_1.1fr] lg:gap-4 lg:pb-16 lg:pt-12">
+        <div className="relative z-10 min-w-0">
+          <p className="inline-flex items-center gap-2 rounded-full bg-[#e2f6d5] px-3 py-2 text-[10px] font-bold uppercase tracking-[0.13em] text-[#163300] sm:px-4 sm:text-[11px]">
+            <span className="size-1.5 shrink-0 rounded-full bg-[#054d28]" aria-hidden="true" />
+            AI margin protector for merchants
+          </p>
+          <h1 className="mt-7 max-w-[11ch] text-[clamp(3.5rem,7.1vw,6.1rem)] font-black uppercase leading-[0.88] tracking-[-0.075em] text-[#0e0f0c]">
+            Stop losing<br /><span className="text-[#163300]">margin.</span>
+          </h1>
+          <p className="mt-6 text-xl font-bold tracking-[-0.035em] text-[#163300] sm:text-2xl">Before stock hits the shelf.</p>
+          <p className="mt-4 max-w-[29rem] text-base leading-7 text-[#454745]">
+            ClaimBack compares what suppliers promised, what they billed and what arrived. Then it follows every claim until the money or stock actually comes back.
+          </p>
+          <div className="mt-7 flex flex-wrap items-center gap-x-5 gap-y-2">
+            <LiveDemoLink />
+            <a href="#how-it-works" className={`inline-flex min-h-12 items-center gap-2 rounded-sm text-sm font-bold underline decoration-[#163300]/40 underline-offset-4 hover:decoration-[#163300] ${focusStyle}`}>
+              See how it works <ArrowDown className="size-4" aria-hidden="true" />
+            </a>
+          </div>
+          <p className="mt-5 flex items-start gap-2 text-xs leading-5 text-[#6a6c6a]">
+            <ShieldCheck className="mt-0.5 size-4 shrink-0 text-[#054d28]" aria-hidden="true" />
+            Your approval comes before a supplier-facing claim.
+          </p>
         </div>
-        <p className="mt-7 text-xs text-[#6a6c6a]">Your approval comes before a supplier-facing claim.</p>
+        <div className="min-w-0">
+          <MarketingScene />
+        </div>
       </section>
 
-      <section aria-labelledby="three-truths-title" className="bg-[#163300] px-5 py-18 text-white sm:px-8 lg:py-24">
+      <section aria-labelledby="three-truths-title" className="bg-[#163300] px-5 py-16 text-white sm:px-8 lg:py-20">
         <div className="mx-auto max-w-[1200px]">
           <div className="flex flex-wrap items-end justify-between gap-6">
             <div>
@@ -159,14 +170,14 @@ export default function Home() {
         </div>
       </section>
 
-      <section id="how-it-works" className="scroll-mt-24 bg-white px-5 py-20 sm:px-8 lg:py-30">
+      <section id="how-it-works" className="scroll-mt-24 bg-white px-5 py-16 sm:px-8 lg:py-22">
         <div className="mx-auto max-w-[1200px]">
           <p className="text-xs font-bold uppercase tracking-[0.17em] text-[#054d28]">How ClaimBack works</p>
           <div className="mt-4 flex flex-wrap items-end justify-between gap-6">
             <h2 className="max-w-[14ch] text-[clamp(2.8rem,5.6vw,5.75rem)] font-black leading-[0.95] tracking-[-0.065em] text-[#0e0f0c]">Messy deliveries.<br />Clear answers.</h2>
             <p className="max-w-sm text-base leading-7 text-[#6a6c6a]">From the first invoice to the final verified credit, every step has a purpose.</p>
           </div>
-          <div className="mt-14 grid gap-10 md:grid-cols-3 md:gap-8">
+          <div className="mt-10 grid gap-10 md:grid-cols-3 md:gap-8">
             {steps.map((step) => (
               <article key={step.title} className="border-t border-[#163300] pt-6">
                 <div className="flex items-start justify-between">
@@ -178,14 +189,14 @@ export default function Home() {
               </article>
             ))}
           </div>
-          <p className="mt-13 inline-flex items-center gap-2 rounded-full bg-[#e2f6d5] px-4 py-2 text-xs font-semibold text-[#163300]">
+          <p className="mt-10 inline-flex items-center gap-2 rounded-full bg-[#e2f6d5] px-4 py-2 text-xs font-semibold text-[#163300]">
             <Check className="size-4" aria-hidden="true" />
             Clean delivery? No claim required.
           </p>
         </div>
       </section>
 
-      <section id="verified-recovery" className="scroll-mt-24 bg-[#e2f6d5] px-5 py-20 sm:px-8 lg:py-28">
+      <section id="verified-recovery" className="scroll-mt-24 bg-[#e2f6d5] px-5 py-16 sm:px-8 lg:py-22">
         <div className="mx-auto grid max-w-[1200px] items-center gap-12 lg:grid-cols-[1fr_0.9fr] lg:gap-20">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.17em] text-[#054d28]">The part most tools forget</p>
@@ -195,7 +206,7 @@ export default function Home() {
             <p className="mt-7 max-w-xl text-base leading-8 text-[#454745] sm:text-lg">
               “Next invoice mein adjust kar denge” leaves money outstanding. ClaimBack keeps the case open until a later invoice, credit note or replacement proves the recovery.
             </p>
-            <Link href="/app" className="mt-7 inline-flex items-center gap-2 text-sm font-bold underline underline-offset-4">
+            <Link href="/app" className={`mt-7 inline-flex min-h-11 items-center gap-2 rounded-sm text-sm font-bold underline underline-offset-4 ${focusStyle}`}>
               Follow a live case <ArrowRight className="size-4" aria-hidden="true" />
             </Link>
           </div>
