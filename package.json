@@ -11,6 +11,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "db:migrate": "node --env-file=.env.local scripts/apply-migration.mjs",
+    "db:migrate:recovery": "node --env-file=.env.local scripts/apply-recovery-migration.mjs",
+    "db:verify:recovery": "node --env-file=.env.local scripts/verify-recovery-sql.mjs",
     "db:verify": "node --env-file=.env.local scripts/verify-foundation.mjs",
     "demo:user": "node --env-file=.env.local scripts/provision-demo-user.mjs"
   },

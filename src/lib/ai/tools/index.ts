@@ -7,6 +7,7 @@ import { createAdminClient } from "../../supabase/admin";
 import { appendCaseEvent } from "../../cases/events";
 import { CaseReconciliationError, inspectCase, reconcileStoredCase } from "../../cases/reconcile";
 import { ClaimOperationError, createDraftClaim, sendSupplierMessage } from "../../claims/operations";
+import { verifyRecovery } from "../../recovery/verify";
 
 type ToolContext = { caseId: string; userId: string };
 
@@ -57,6 +58,12 @@ export function createAgentTools(context: ToolContext) {
       description: "Send the draft through the demo transport only if merchant approval was recorded by the authenticated approval action.",
       inputSchema: z.object({}),
       execute: () => runCaseTool(context, "send_supplier_message", () => sendSupplierMessage(context.caseId)),
+    }),
+    verifyRecovery: tool({
+      description: "Check a newly uploaded credit note or later invoice against open obligations. Supplier promises alone never count as recovered. A merchant may need to select obligations when several are open.",
+      inputSchema: z.object({ artifactId: z.uuid(), obligationIds: z.array(z.uuid()).max(20).optional() }),
+      execute: ({ artifactId, obligationIds }) => runCaseTool(context, "verify_recovery",
+        () => verifyRecovery({ caseId: context.caseId, artifactId, obligationIds })),
     }),
   };
 }
