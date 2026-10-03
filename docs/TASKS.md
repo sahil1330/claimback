@@ -1,5 +1,23 @@
 # ClaimBack Task Board
 
+The live board is [GitHub Project #4](https://github.com/users/sahil1330/projects/4).
+Each task below has a single assigned repository issue. Follow
+[`docs/AGENT_TASK_WORKFLOW.md`](AGENT_TASK_WORKFLOW.md) before starting new work.
+New tasks must be assigned issues and added to the project to avoid collisions.
+
+| Person A — `sahil1330` | Person B — `harsh-gupta-10` |
+| --- | --- |
+| [A1 · Bootstrap/auth/data #1](https://github.com/sahil1330/claimback/issues/1) | [B1 · Design/auth shell #9](https://github.com/sahil1330/claimback/issues/9) |
+| [A2 · Source-grounded extraction #2](https://github.com/sahil1330/claimback/issues/2) | [B2 · ROI dashboard #10](https://github.com/sahil1330/claimback/issues/10) |
+| [A3 · Reconciliation/state #3](https://github.com/sahil1330/claimback/issues/3) | [B3 · Receive Stock #11](https://github.com/sahil1330/claimback/issues/11) |
+| [A4 · Agent/approval guard #4](https://github.com/sahil1330/claimback/issues/4) | [B4 · Discrepancy/clean UI #12](https://github.com/sahil1330/claimback/issues/12) |
+| [A5 · Supplier simulator #5](https://github.com/sahil1330/claimback/issues/5) | [B5 · Case/approval UI #13](https://github.com/sahil1330/claimback/issues/13) |
+| [A6 · Verified recovery #6](https://github.com/sahil1330/claimback/issues/6) | [B6 · Recovery UI #14](https://github.com/sahil1330/claimback/issues/14) |
+| [A7 · Reset/evaluation #7](https://github.com/sahil1330/claimback/issues/7) | [B7 · Demo assets/landing #15](https://github.com/sahil1330/claimback/issues/15) |
+| [A8 · Optional voice/follow-up #8](https://github.com/sahil1330/claimback/issues/8) | [B8 · Optional voice/polish #16](https://github.com/sahil1330/claimback/issues/16) |
+
+Issues A8 and B8 are P1. All other linked issues are P0.
+
 ## Person A — backend / AI / Supabase
 
 Owns primarily:

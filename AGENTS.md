@@ -2,6 +2,14 @@
 
 This is the primary implementation authority for coding agents.
 
+## GitHub task coordination
+
+Before starting or expanding implementation work, follow `docs/AGENT_TASK_WORKFLOW.md`.
+Every work item must have a repository issue assigned to its owner. Add that issue
+to the ClaimBack GitHub Project before work when project access is available.
+Use the issue to record dependencies, touched files, progress, and handoffs so
+the two assignees do not edit the same area at the same time.
+
 ## Required read order
 
 Before writing code, read:
