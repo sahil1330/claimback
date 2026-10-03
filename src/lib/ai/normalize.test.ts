@@ -116,6 +116,26 @@ describe("source-grounded extraction normalization", () => {
     expect(confirmed.lines[0]).toMatchObject({ receivedQuantity: 47, damagedQuantity: 2, merchantConfirmed: true });
   });
 
+  it("keeps a product-unnamed Hindi receiving note recoverable", () => {
+    const note = "फिफ्टी बॉक्सेस मंगवाए थे लेकिन फोर्टी एट हैं।";
+    const suggestion = normalizeReceivingOutput({
+      evidence: { excerpt: note, locator: null },
+      lines: [{
+        rawName: "", skuRef: null, unit: "बॉक्सेस", packSize: null,
+        receivedQuantity: null, receivedFreeQuantity: null, damagedQuantity: null,
+        confidence: "low", evidence: { excerpt: note, locator: null },
+        uncertainties: [{ field: "receivedQuantity", reason: "48 total boxes are present, but the paid/free split is unclear" }],
+      }],
+      uncertainties: [],
+    }, source, note);
+    expect(suggestion.status).toBe("needs_confirmation");
+    if (suggestion.status !== "needs_confirmation") throw new Error("confirmation expected");
+    expect(suggestion.facts.lines[0]).toMatchObject({
+      rawName: "Product not named", receivedQuantity: null, merchantConfirmed: false,
+    });
+    expect(suggestion.confirmations.some((item) => item.field === "lines.0.rawName")).toBe(true);
+  });
+
   it("rejects damaged units above received units", () => {
     expect(() => confirmReceivingInput({
       source: { sourceArtifactId: source.artifactId, sourceLabel: source.label, excerpt: null, locator: null },

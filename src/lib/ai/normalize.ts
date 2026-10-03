@@ -209,6 +209,10 @@ export function normalizeReceivingOutput(raw: unknown, sourceInput: ExtractionSo
   const lines = parsed.data.lines.map((line, index) => {
     const lineSource = evidence(source.data, line.evidence);
     const lineUncertainties = uncertainties(line.uncertainties);
+    const productNotNamed = line.rawName.trim().length === 0;
+    if (productNotNamed && !lineUncertainties.some((item) => item.field === "rawName")) {
+      lineUncertainties.push({ field: "rawName", reason: "Merchant did not name a product; confirm which invoice line this count belongs to" });
+    }
     addModelUncertainties(confirmations, lineUncertainties, lineSource, `lines.${index}.`);
     addLineChecks(confirmations, lineSource, line.confidence, index);
     addTextGroundingChecks(confirmations, lineSource, sourceText, index, [
@@ -219,7 +223,7 @@ export function normalizeReceivingOutput(raw: unknown, sourceInput: ExtractionSo
     if (line.damagedQuantity === null) confirmation(confirmations, `lines.${index}.damagedQuantity`, "Damaged quantity needs merchant confirmation, including zero", lineSource);
     confirmation(confirmations, `lines.${index}.merchantConfirmed`, "Merchant must confirm receiving facts", lineSource);
     return {
-      rawName: line.rawName.trim(), skuRef: line.skuRef?.trim() || null,
+      rawName: productNotNamed ? "Product not named" : line.rawName.trim(), skuRef: line.skuRef?.trim() || null,
       unit: line.unit?.trim() || null, packSize: line.packSize?.trim() || null,
       receivedQuantity: line.receivedQuantity, receivedFreeQuantity: line.receivedFreeQuantity,
       damagedQuantity: line.damagedQuantity,
