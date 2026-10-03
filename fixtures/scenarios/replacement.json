@@ -1,0 +1,5 @@
+{
+  "id": "replacement",
+  "name": "Physical replacement promised",
+  "steps": ["replacement_promise"]
+}

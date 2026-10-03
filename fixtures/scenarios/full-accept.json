@@ -1,0 +1,5 @@
+{
+  "id": "full_accept",
+  "name": "Full claim accepted with a future credit promise",
+  "steps": ["full_credit_promise"]
+}
