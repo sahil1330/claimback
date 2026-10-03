@@ -11,6 +11,8 @@ import {
 } from "lucide-react";
 import { DemoDownloads } from "../components/marketing/demo-downloads";
 import { MarketingScene } from "../components/marketing/marketing-scene";
+import { MarketingMotion } from "../components/marketing/marketing-motion";
+import motionStyles from "../components/marketing/marketing-motion.module.css";
 
 const focusStyle = "focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#054d28]";
 
@@ -76,8 +78,10 @@ function LiveDemoLink({ inverse = false }: { inverse?: boolean }) {
 
 export default function Home() {
   return (
-    <main className="min-h-screen overflow-x-clip bg-white text-[#163300]">
+    <main data-marketing-page className={motionStyles.page + " min-h-screen overflow-x-clip bg-white text-[#163300]"}>
+      <MarketingMotion />
       <header className="sticky top-0 z-50 border-b border-[#e8ebe6] bg-white/95 backdrop-blur-sm">
+        <span aria-hidden="true" data-marketing-progress className={motionStyles.progress} />
         <div className="mx-auto flex min-h-18 max-w-[1200px] items-center justify-between gap-4 px-5 sm:px-8">
           <Brand />
           <nav aria-label="Main navigation" className="hidden items-center gap-1 rounded-full bg-[#e8ebe6] p-1 lg:flex">
@@ -95,7 +99,7 @@ export default function Home() {
       </header>
 
       <section className="mx-auto grid max-w-[1200px] items-center gap-8 px-5 pb-12 pt-10 sm:gap-10 sm:px-8 sm:pt-14 lg:grid-cols-[0.9fr_1.1fr] lg:gap-4 lg:pb-16 lg:pt-12">
-        <div className="relative z-10 min-w-0">
+        <div className={motionStyles.heroCopy + " relative z-10 min-w-0"}>
           <p className="inline-flex items-center gap-2 rounded-full bg-[#e2f6d5] px-3 py-2 text-[10px] font-bold uppercase tracking-[0.13em] text-[#163300] sm:px-4 sm:text-[11px]">
             <span className="size-1.5 shrink-0 rounded-full bg-[#054d28]" aria-hidden="true" />
             AI margin protector for merchants
@@ -118,14 +122,14 @@ export default function Home() {
             Your approval comes before a supplier-facing claim.
           </p>
         </div>
-        <div className="min-w-0">
+        <div className={motionStyles.heroScene + " min-w-0"}>
           <MarketingScene />
         </div>
       </section>
 
       <section aria-labelledby="three-truths-title" className="bg-[#163300] px-5 py-16 text-white sm:px-8 lg:py-20">
         <div className="mx-auto max-w-[1200px]">
-          <div className="flex flex-wrap items-end justify-between gap-6">
+          <div data-marketing-reveal className={motionStyles.reveal + " flex flex-wrap items-end justify-between gap-6"}>
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.17em] text-[#9fe870]">One delivery. Three truths.</p>
               <h2 id="three-truths-title" className="mt-4 max-w-[12ch] text-[clamp(2.8rem,5.5vw,5.5rem)] font-black leading-[0.95] tracking-[-0.065em]">
@@ -135,8 +139,8 @@ export default function Home() {
             <p className="max-w-xs text-sm leading-6 text-white/75">A source-linked example from the synthetic files included with the live demo.</p>
           </div>
           <div className="mt-11 grid gap-3 md:grid-cols-3">
-            {truths.map((truth) => (
-              <article key={truth.name} className="min-h-48 rounded-[10px] bg-white p-6 text-[#163300]">
+            {truths.map((truth, index) => (
+              <article key={truth.name} data-marketing-reveal style={{ transitionDelay: index * 70 + "ms" }} className={motionStyles.reveal + " " + motionStyles.lift + " min-h-48 rounded-[10px] bg-white p-6 text-[#163300]"}>
                 <div className="flex items-start justify-between gap-3">
                   <p className="text-xs font-black uppercase tracking-[0.16em]">{truth.name}</p>
                   <span className="font-mono text-xs text-[#555a55]">{truth.number}</span>
@@ -147,7 +151,7 @@ export default function Home() {
             ))}
           </div>
           <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_auto]">
-            <div className="rounded-[10px] bg-[#054d28] p-6 sm:p-8">
+            <div data-marketing-reveal className={motionStyles.reveal + " rounded-[10px] bg-[#054d28] p-6 sm:p-8"}>
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#b5e59b]">Grounded differences</p>
                 <span className="rounded-full border border-white/30 px-3 py-1 text-xs font-semibold">4 found</span>
@@ -161,7 +165,7 @@ export default function Home() {
                 ))}
               </div>
             </div>
-            <div className="flex min-w-0 flex-col justify-between rounded-[10px] bg-[#9fe870] p-6 text-[#163300] sm:p-8">
+            <div data-marketing-reveal className={motionStyles.reveal + " flex min-w-0 flex-col justify-between rounded-[10px] bg-[#9fe870] p-6 text-[#163300] sm:p-8"}>
               <p className="text-xs font-black uppercase tracking-[0.16em]">Potential recovery</p>
               <p className="mt-8 font-mono text-[clamp(2.6rem,5vw,4.5rem)] font-bold leading-none tracking-[-0.08em]">₹3,218</p>
               <p className="mt-3 text-xs leading-5">Calculated from this synthetic delivery. Recovery is verified later.</p>
@@ -173,13 +177,13 @@ export default function Home() {
       <section id="how-it-works" className="scroll-mt-24 bg-white px-5 py-16 sm:px-8 lg:py-22">
         <div className="mx-auto max-w-[1200px]">
           <p className="text-xs font-bold uppercase tracking-[0.17em] text-[#054d28]">How ClaimBack works</p>
-          <div className="mt-4 flex flex-wrap items-end justify-between gap-6">
+          <div data-marketing-reveal className={motionStyles.reveal + " mt-4 flex flex-wrap items-end justify-between gap-6"}>
             <h2 className="max-w-[14ch] text-[clamp(2.8rem,5.6vw,5.75rem)] font-black leading-[0.95] tracking-[-0.065em] text-[#0e0f0c]">Messy deliveries.<br />Clear answers.</h2>
             <p className="max-w-sm text-base leading-7 text-[#6a6c6a]">From the first invoice to the final verified credit, every step has a purpose.</p>
           </div>
           <div className="mt-10 grid gap-10 md:grid-cols-3 md:gap-8">
-            {steps.map((step) => (
-              <article key={step.title} className="border-t border-[#163300] pt-6">
+            {steps.map((step, index) => (
+              <article key={step.title} data-marketing-reveal style={{ transitionDelay: index * 70 + "ms" }} className={motionStyles.reveal + " " + motionStyles.lift + " border-t border-[#163300] pt-6"}>
                 <div className="flex items-start justify-between">
                   <step.icon className="size-7 text-[#163300]" strokeWidth={1.8} aria-hidden="true" />
                   <span className="font-mono text-sm text-[#555a55]">{step.number}</span>
@@ -198,7 +202,7 @@ export default function Home() {
 
       <section id="verified-recovery" className="scroll-mt-24 bg-[#e2f6d5] px-5 py-16 sm:px-8 lg:py-22">
         <div className="mx-auto grid max-w-[1200px] items-center gap-12 lg:grid-cols-[1fr_0.9fr] lg:gap-20">
-          <div>
+          <div data-marketing-reveal className={motionStyles.reveal}>
             <p className="text-xs font-bold uppercase tracking-[0.17em] text-[#054d28]">The part most tools forget</p>
             <h2 className="mt-4 max-w-[11ch] text-[clamp(2.8rem,5.5vw,5.5rem)] font-black leading-[0.95] tracking-[-0.065em] text-[#0e0f0c]">
               A promise is not payment.
@@ -210,7 +214,7 @@ export default function Home() {
               Follow a live case <ArrowRight className="size-4" aria-hidden="true" />
             </Link>
           </div>
-          <div className="rounded-[28px] bg-white p-6 text-[#163300] shadow-[0_16px_48px_rgba(22,51,0,0.08)] sm:p-8">
+          <div data-marketing-reveal className={motionStyles.reveal + " rounded-[28px] bg-white p-6 text-[#163300] shadow-[0_16px_48px_rgba(22,51,0,0.08)] sm:p-8"}>
             <div className="flex items-center justify-between gap-3 border-b border-[#e8ebe6] pb-5">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#6a6c6a]">Recovery memory</p>
@@ -225,7 +229,7 @@ export default function Home() {
                 ["Later evidence checked", "Posted credit note matches the claim."],
                 ["Recovery verified", "₹3,218 recovered · case closed."],
               ].map(([title, detail], index) => (
-                <li key={title} className="flex gap-4">
+                <li key={title} data-marketing-reveal style={{ transitionDelay: index * 65 + "ms" }} className={motionStyles.reveal + " flex gap-4"}>
                   <span className={index === 3
                     ? "flex size-8 shrink-0 items-center justify-center rounded-full bg-[#163300] text-[#9fe870]"
                     : "flex size-8 shrink-0 items-center justify-center rounded-full bg-[#e2f6d5] text-[#163300]"}>
@@ -250,7 +254,7 @@ export default function Home() {
       <footer className="bg-[#163300] px-5 pb-10 pt-20 text-white sm:px-8 lg:pt-24">
         <div className="mx-auto max-w-[1200px]">
           <p className="text-xs font-bold uppercase tracking-[0.17em] text-[#9fe870]">Keep what you earned</p>
-          <div className="mt-4 flex flex-wrap items-end justify-between gap-8 border-b border-white/25 pb-16">
+          <div data-marketing-reveal className={motionStyles.reveal + " mt-4 flex flex-wrap items-end justify-between gap-8 border-b border-white/25 pb-16"}>
             <h2 className="max-w-[12ch] text-[clamp(3rem,6vw,6rem)] font-black uppercase leading-[0.9] tracking-[-0.07em] text-[#9fe870]">Your margin.<br />Protected.</h2>
             <LiveDemoLink inverse />
           </div>

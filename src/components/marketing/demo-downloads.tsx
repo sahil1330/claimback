@@ -1,4 +1,5 @@
 import { ArrowDownToLine } from "lucide-react";
+import motionStyles from "./marketing-motion.module.css";
 
 const files = [
   { label: "Golden invoice", href: "/demo/golden-invoice.txt", detail: "50 paid boxes at the billed rate" },
@@ -11,7 +12,7 @@ export function DemoDownloads() {
   return (
     <section id="demo-kit" className="scroll-mt-24 bg-white px-5 py-20 text-[#163300] sm:px-8 lg:py-28">
       <div className="mx-auto max-w-[1200px]">
-        <div className="flex flex-wrap items-end justify-between gap-6">
+        <div data-marketing-reveal className={motionStyles.reveal + " flex flex-wrap items-end justify-between gap-6"}>
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.17em] text-[#054d28]">Try it yourself</p>
             <h2 className="mt-4 max-w-[14ch] text-[clamp(2.8rem,5.5vw,5.5rem)] font-black leading-[0.95] tracking-[-0.065em] text-[#0e0f0c]">
@@ -28,7 +29,9 @@ export function DemoDownloads() {
               key={file.href}
               href={file.href}
               download
-              className="group flex min-h-48 flex-col justify-between rounded-[10px] bg-[#e8ebe6] p-5 transition-colors hover:bg-[#e2f6d5]"
+              data-marketing-reveal
+              style={{ transitionDelay: index * 65 + "ms" }}
+              className={"group flex min-h-48 flex-col justify-between rounded-[10px] bg-[#e8ebe6] p-5 hover:bg-[#e2f6d5] " + motionStyles.reveal + " " + motionStyles.lift}
             >
               <div className="flex items-start justify-between gap-3">
                 <span className="font-mono text-xs text-[#555a55]">0{index + 1}</span>
