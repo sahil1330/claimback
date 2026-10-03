@@ -1,0 +1,18 @@
+SYNTHETIC DEMO DOCUMENT — NOT A REAL COMMERCIAL INVOICE
+NORTH STAR PHARMA DISTRIBUTORS
+Tax Invoice INV-3812
+Invoice date: 03 October 2026
+Bill to: Sharma Medical
+
+Item 1
+Product: Maggi Masala Noodles 70g
+SKU: MG-70
+Pack size: 70g
+Unit: box
+Paid quantity: 50 boxes
+Unit purchase rate: ₹441.00 per box
+Discount: none
+Line amount: ₹22,050.00
+
+Invoice total: ₹22,050.00
+This invoice lists only paid boxes. Free scheme units are recorded at receiving.

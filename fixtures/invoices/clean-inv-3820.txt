@@ -1,0 +1,18 @@
+SYNTHETIC DEMO DOCUMENT — NOT A REAL COMMERCIAL INVOICE
+NORTH STAR PHARMA DISTRIBUTORS
+Tax Invoice INV-3820
+Invoice date: 03 October 2026
+Bill to: Sharma Medical
+
+Item 1
+Product: Paracetamol 500 mg tablets
+SKU: PCM-500
+Pack size: 10 tablets per strip
+Unit: box
+Paid quantity: 20 boxes
+Unit purchase rate: ₹120.00 per box
+Discount: none
+Line amount: ₹2,400.00
+
+Invoice total: ₹2,400.00
+No free units are listed or promised for this order.

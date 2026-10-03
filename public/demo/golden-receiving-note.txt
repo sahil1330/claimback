@@ -1,0 +1,8 @@
+SYNTHETIC DEMO RECEIVING NOTE — MERCHANT-COUNTED FACTS FOR DEMO ONLY
+Sharma Medical · Invoice INV-3812 · 03 October 2026
+Maggi Masala Noodles 70g (SKU MG-70, 70g box):
+48 paid boxes physically arrived.
+3 free boxes physically arrived.
+2 of the 48 paid boxes have visibly crushed and opened outer packaging.
+The remaining 46 paid boxes are saleable.
+Merchant must review and confirm these counts in ClaimBack before reconciliation.

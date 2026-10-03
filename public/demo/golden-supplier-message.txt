@@ -1,0 +1,11 @@
+SYNTHETIC DEMO MESSAGE — NOT A REAL SUPPLIER CONVERSATION
+From: North Star Pharma Distributors
+To: Sharma Medical
+Order reference: INV-3812
+Date: 02 October 2026
+
+Confirmed for Maggi Masala Noodles 70g, SKU MG-70, pack size 70g, unit box:
+50 paid boxes at the agreed purchase rate of ₹428.00 per box.
+Scheme: buy 10 paid boxes, get 1 free box (10+1). On 50 paid boxes, 5 free boxes are due.
+Discount: none.
+Please check paid, free, and damaged boxes when the delivery arrives.

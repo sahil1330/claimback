@@ -1,0 +1,12 @@
+SYNTHETIC DEMO DOCUMENT — NOT A REAL COMMERCIAL INVOICE
+NORTH STAR PHARMA DISTRIBUTORS
+Tax Invoice INV-4003
+Invoice date: 07 October 2026
+Bill to: Sharma Medical
+
+Item 1: Paracetamol 500 mg tablets (PCM-500), 50 boxes at ₹120.00 per box.
+Goods subtotal: ₹6,000.00
+Posted credit adjustment against INV-3812: ₹3,218.00
+Amount due after posted credit: ₹2,782.00
+
+The ₹3,218.00 credit is posted on this later invoice, not merely promised.
