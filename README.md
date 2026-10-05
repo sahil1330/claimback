@@ -1,5 +1,12 @@
 # ClaimBack
 
+> **🚀 Live Demo & Evaluator Credentials**
+> - **Live App:** [claimback.claimback-app.workers.dev](https://claimback.claimback-app.workers.dev/)
+> - **Demo Email:** `DEMO_USER_EMAIL=sharma-medical-demo@example.com`
+> - **Demo Password:** `DEMO_USER_PASSWORD=qIE2-5ceAEmAo2bV0U0byq76uf6U-ZFz`
+>
+> *Pre-configured with complete Sharma Medical synthetic evidence, WhatsApp agreements, and verified recovery history.*
+
 **ClaimBack is an AI Margin Protector for small merchants.** It helps a merchant catch money lost while receiving stock, pursue a supplier claim, and confirm that the promised credit or replacement actually arrives. It is built for businesses such as pharmacies and high-volume retailers that manage paper invoices, supplier messages, and frequent deliveries without a full procurement system.
 
 **The question it answers:** What did the supplier promise, what did they bill, and what physically arrived?
@@ -31,7 +38,7 @@ Suppose a supplier owes ₹1,584 and replies, “Next invoice mein adjust kar de
 
 Authentication, evidence storage, model-backed structured extraction, deterministic reconciliation, case state, supplier-response interpretation, and recovery verification use the product implementation. **External supplier communication and response timing are simulated** by scenario-driven demo transport. The bundled Sharma Medical, supplier, invoice, and credit evidence is [synthetic](fixtures/README.md); no real supplier is contacted and no real credit is issued. ClaimBack has no live WhatsApp or Paytm integration. Paytm for Business and Soundbox-like reminders are a **future distribution idea**.
 
-The deployed demo is at [claimback.claimback-app.workers.dev](https://claimback.claimback-app.workers.dev/). The sample evidence is available under [`public/demo/`](public/demo/), and the walkthrough is in [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md). A dedicated demo account must be provisioned separately; credentials are never committed.
+The deployed demo is at [claimback.claimback-app.workers.dev](https://claimback.claimback-app.workers.dev/). The sample evidence is available under [`public/demo/`](public/demo/), and the walkthrough is in [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md). You can sign in immediately with the evaluator demo credentials provided at the top of this README.
 
 ## Run locally
 
